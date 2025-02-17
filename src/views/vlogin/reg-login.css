@@ -1,0 +1,101 @@
+/* Fondo que cubre toda la pantalla */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100vw; /* Ocupar todo el ancho */
+  background: linear-gradient(to bottom, #2a4d69, #3b6978, #79a7a8);
+  position: fixed; /* Fija el fondo en pantalla */
+  top: 0;
+  left: 0;
+}
+
+/* Caja de login centrada */
+.login-box {
+  background-color: rgba(255, 255, 255, 0.95);
+  padding: 50px;
+  border-radius: 15px;
+  width: 360px;
+  text-align: center;
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Título */
+.login-box h2 {
+  font-size: 26px;
+  color: #206a5d;
+  margin-bottom: 10px;
+}
+
+/* Descripción */
+.login-description {
+  font-size: 15px;
+  color: #555;
+  margin-bottom: 20px;
+}
+
+/* Formulario */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Campos de entrada */
+.login-form input {
+  padding: 12px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  font-size: 15px;
+  background-color: #f8f8f8;
+  transition: border-color 0.3s ease;
+  width: 100%;
+}
+
+.login-form input:focus {
+  border-color: #206a5d;
+  outline: none;
+}
+
+/* Botón de login */
+.login-button {
+  background-color: #3b6978;
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  width: 100%;
+}
+
+.login-button:hover {
+  background-color: #204051;
+  transform: scale(1.05);
+}
+
+/* Mensaje de error */
+.error-text {
+  color: #d9534f;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+/* Responsividad */
+@media (max-width: 768px) {
+  .login-box {
+    width: 90%;
+    padding: 35px;
+  }
+
+  .login-box h2 {
+    font-size: 22px;
+  }
+
+  .login-button {
+    font-size: 15px;
+  }
+}
