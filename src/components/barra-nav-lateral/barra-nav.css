@@ -1,7 +1,7 @@
 .sidebar {
-  width: 280px; 
+  width: 280px;
   height: 100vh;
-  background-color: #f8f1eb; 
+  background-color: #f5f5f5; /* Gris claro */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -72,21 +72,21 @@
   width: 90%;
   padding: 12px 20px;
   margin: 5px auto;
-  background-color: #1e2b3c;
+  background-color: #4caf50; /* Verde claro */
   color: white;
   border: none;
-  border-radius: 10px; 
+  border-radius: 10px;
   font-size: 1em;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   text-decoration: none;
-  transition: background-color 0.3s ease, transform 0.2s ease; /* Añadido transform */
+  transition: background-color 0.3s ease, transform 0.2s ease;
 }
 
 .nav-button a {
-  color: inherit; 
+  color: inherit;
   text-decoration: none;
   width: 100%;
   height: 100%;
@@ -97,30 +97,30 @@
 
 .nav-button.active,
 .nav-button:hover {
-  background-color: #c17857; /* Color de hover más visible */
-  transform: scale(1.05); /* Aumento de tamaño en hover */
+  background-color: #c17857; /* Naranja */
+  transform: scale(1.05);
   box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2); /* Sombra adicional en hover */
 }
 
 .nav-button:active {
-  background-color: #a85d4c;
+  background-color: #a85d4c; /* Naranja oscuro */
 }
+
 .nav-button.disabled {
   pointer-events: none;
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* Agrega un estilo para los botones deshabilitados */
 .disabled-button {
-  pointer-events: none; /* Evita clics en el botón */
-  opacity: 0.5; /* Reduce la opacidad para indicar que está deshabilitado */
-  cursor: not-allowed; /* Cambia el cursor al estilo de no permitido */
+  pointer-events: none;
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 @media (max-width: 768px) {
   .sidebar {
-    width: 220px; /* Reducir ancho en dispositivos pequeños */
+    width: 220px;
     padding: 20px 10px;
   }
 

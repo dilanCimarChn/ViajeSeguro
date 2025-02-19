@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { query, where, getDocs, collection } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
-import './reg-login.css';
+import './reg-login.css';  // Asegúrate de que la ruta sea correcta
 
 function RegLogin() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);  // Estado para mostrar u ocultar la contraseña
 
   const handleIngresarClick = async () => {
     const auth = getAuth();
@@ -17,25 +18,25 @@ function RegLogin() {
       // Iniciar sesión con Firebase Authentication
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      console.log('Usuario autenticado:', user);
 
-      // Buscar usuario en Firestore por correo
-      const q = query(collection(db, 'usuarios'), where('email', '==', email));
+      // Buscar usuario en Firestore por UID
+      const q = query(collection(db, 'usuarios'), where('uid', '==', user.uid));
       const querySnapshot = await getDocs(q);
 
       if (!querySnapshot.empty) {
         const userData = querySnapshot.docs[0].data();
+        console.log('Datos en Firestore:', userData);
 
         // Verificar si el usuario está activo
         if (!userData.active) {
           throw new Error('Tu cuenta está deshabilitada. Contacta al administrador.');
         }
 
-        const userRole = userData.role;
-
         // Almacenar el rol en localStorage
-        localStorage.setItem('userRole', userRole);
+        localStorage.setItem('userRole', userData.role);
 
-        // Redirigir según el rol
+        // Redirigir al usuario según su rol
         navigate('/gestion-usuarios');
       } else {
         throw new Error('Usuario no encontrado en Firestore.');
@@ -44,18 +45,18 @@ function RegLogin() {
       setError(
         error.message.includes('deshabilitada')
           ? 'Tu cuenta está deshabilitada. Contacta al administrador.'
-          : 'Credenciales incorrectas'
+          : 'Credenciales incorrectas o cuenta no registrada en Firestore.'
       );
-      console.error(error);
+      console.error('Error en login:', error);
     }
   };
 
   return (
-    <div className="login-container">
-      <div className="login-box">
+    <div className="reg-login-container">
+      <div className="reg-login-box">
         <h2>Iniciar Sesión</h2>
-        <p className="login-description">Bienvenido de nuevo, ingresa tus credenciales</p>
-        <div className="login-form">
+        <p className="reg-login-description">Bienvenido de nuevo, ingresa tus credenciales</p>
+        <div className="reg-login-form">
           <label>Email</label>
           <input
             type="email"
@@ -64,16 +65,25 @@ function RegLogin() {
             onChange={(e) => setEmail(e.target.value)}
           />
           <label>Contraseña</label>
-          <input
-            type="password"
-            placeholder="Contraseña"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <button className="login-button" onClick={handleIngresarClick}>
+          <div className="password-container">
+            <input
+              type={showPassword ? "text" : "password"}  // Muestra/oculta la contraseña
+              placeholder="Contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <button
+              type="button"
+              className="show-password-btn"
+              onClick={() => setShowPassword(!showPassword)}  // Alterna la visibilidad de la contraseña
+            >
+              {showPassword ? "Ocultar" : "Mostrar"}
+            </button>
+          </div>
+          <button className="reg-login-button" onClick={handleIngresarClick}>
             Ingresar
           </button>
-          {error && <p className="error-text">{error}</p>}
+          {error && <p className="reg-login-error-text">{error}</p>}
         </div>
       </div>
     </div>

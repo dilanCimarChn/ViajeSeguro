@@ -15,7 +15,7 @@ const BarraNavLateral = () => {
   return (
     <div className="sidebar">
       <div className="logo">
-        <img src="/helios.svg" alt="Helios Logo" className="logo-image" />
+        <img src="/Viajeseguro.svg" alt="Viaje Seguro" className="logo-image" />
         <h2>VIAJE SEGURO</h2>
         <p>PANEL DE {userRole === 'admin' ? 'ADMINISTRADOR' : 'RECEPCIONISTA'}</p>
       </div>
@@ -37,11 +37,11 @@ const BarraNavLateral = () => {
 };
 
 /**
- * Cierra la sesión y redirige a la página de login.
+ * Cierra la sesión y redirige a la página de bienvenida.
  */
 const handleLogout = () => {
   localStorage.removeItem('userRole');
-  window.location.href = '/login';
+  window.location.href = '/';
 };
 
 export default BarraNavLateral;
