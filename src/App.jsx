@@ -1,35 +1,56 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import BienvenidaLogin from './views/vlogin/bienvenida-login';
+import RegLogin from './views/vlogin/reg-login';
+import VistaGestionUsuarios from './views/vgestion-usuarios/gestion-usuarios';
+import BarraNavLateral from './components/barra-nav-lateral/barra-nav';
 
+// Tu lógica de almacenamiento de rol
 function App() {
-  const [count, setCount] = useState(0)
+  const [userRole, setUserRole] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const role = localStorage.getItem('userRole');
+    setUserRole(role);
+    setLoading(false);
+  }, []);
+
+  if (loading) {
+    return <div>Cargando...</div>;
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <Router>
+      <Routes>
+        {/* Rutas públicas */}
+        <Route path="/" element={<BienvenidaLogin />} />
+        <Route path="/login" element={<RegLogin />} />
+
+        {/* Rutas protegidas con BarraNavLateral */}
+        {userRole && (
+          <Route element={<LayoutWithSidebar />}>
+            <Route path="gestion-usuarios" element={<VistaGestionUsuarios />} />
+          </Route>
+        )}
+
+        {/* Redirección si la ruta no existe */}
+        <Route path="*" element={<Navigate to={userRole ? '/gestion-usuarios' : '/login'} replace />} />
+      </Routes>
+    </Router>
+  );
 }
 
-export default App
+// Componente que envuelve las rutas protegidas y muestra la Barra de Navegación.
+const LayoutWithSidebar = () => {
+  return (
+    <div className="app-container">
+      <BarraNavLateral />
+      <Routes>
+        <Route path="gestion-usuarios" element={<VistaGestionUsuarios />} />
+      </Routes>
+    </div>
+  );
+};
+
+export default App;

@@ -1,0 +1,118 @@
+/* Estilos para Reg Login */
+.reg-login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100vw;
+  background: linear-gradient(to bottom, #313940, #1FBF92); /* Fondo de la pantalla con la nueva paleta */
+  position: fixed;
+  top: 0;
+  left: 0;
+}
+
+/* Caja de login centrada */
+.reg-login-box {
+  background-color: rgba(242, 242, 242, 0.95); /* Fondo blanco suave */
+  padding: 50px;
+  border-radius: 15px;
+  width: 360px;
+  text-align: center;
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Título */
+.reg-login-box h2 {
+  font-size: 26px;
+  color: #038C65; /* Verde más oscuro */
+  margin-bottom: 10px;
+}
+
+/* Descripción */
+.reg-login-description {
+  font-size: 15px;
+  color: #555; /* Gris oscuro */
+  margin-bottom: 20px;
+}
+
+/* Formulario */
+.reg-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Campos de entrada */
+.reg-login-form input {
+  padding: 12px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  font-size: 15px;
+  background-color: #F2F2F2; /* Blanco suave para campos */
+  transition: border-color 0.3s ease;
+  width: 100%;
+}
+
+.reg-login-form input:focus {
+  border-color: #038C65; /* Resaltar con verde más oscuro */
+  outline: none;
+}
+
+/* Botón de login */
+.reg-login-button {
+  background-color: #2FE2C1; /* Verde menta claro */
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  width: 100%;
+}
+
+.reg-login-button:hover {
+  background-color: #1FBF92; /* Verde menta brillante */
+  transform: scale(1.05);
+}
+
+/* Mensaje de error */
+.reg-login-error-text {
+  color: #d9534f; /* Rojo para el error */
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+/* Responsividad */
+@media (max-width: 768px) {
+  .reg-login-box {
+    width: 90%;
+    padding: 35px;
+  }
+
+  .reg-login-box h2 {
+    font-size: 22px;
+  }
+
+  .reg-login-button {
+    font-size: 15px;
+  }
+}
+
+/* Estilos para el contenedor de la contraseña */
+.password-container {
+  position: relative;
+}
+
+.show-password-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #038C65;
+  font-size: 14px;
+  cursor: pointer;
+}

@@ -1,0 +1,104 @@
+.gestion-usuarios {
+  padding: 30px;
+  max-width: 800px;
+  margin: auto;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  font-family: Arial, sans-serif;
+}
+
+h2, h3 {
+  text-align: center;
+  color: #333333;
+  font-weight: bold;
+}
+
+.form-crear-usuario {
+  display: grid;
+  gap: 15px;
+  grid-template-columns: 1fr 1fr;
+}
+
+input, select, button {
+  padding: 10px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: 1px solid #cccccc;
+}
+
+button {
+  grid-column: span 2;
+  background-color: #d87f6a;
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #bf6e5d;
+}
+
+.lista-usuarios {
+  margin-top: 20px;
+}
+
+.card-usuario {
+  background-color: #f8f8f8;
+  margin: 10px 0;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.card-usuario p {
+  margin: 5px 0;
+}
+
+.btn-desactivar {
+  background-color: #d9534f;
+  color: white;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.btn-activar {
+  background-color: #5cb85c;
+  color: white;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+/* Tabla de usuarios */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+th, td {
+  padding: 12px;
+  text-align: center;
+  border: 1px solid #ddd;
+}
+
+button {
+  margin: 5px;
+  padding: 8px 12px;
+  background-color: #038C65;
+  border: none;
+  color: white;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #1FBF92;
+}
+
+th {
+  background-color: #038C65;
+  color: white;
+}
