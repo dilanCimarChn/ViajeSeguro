@@ -3,24 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { query, where, getDocs, collection } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
-import './reg-login.css';  // Asegúrate de que la ruta sea correcta
+import './reg-login.css';
 
 function RegLogin() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);  // Estado para mostrar u ocultar la contraseña
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleIngresarClick = async () => {
     const auth = getAuth();
     try {
-      // Iniciar sesión con Firebase Authentication
+      // Intentar iniciar sesión con Firebase Authentication
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       console.log('Usuario autenticado:', user);
 
-      // Buscar usuario en Firestore por UID
+      // Verificar si el usuario existe en Firestore
       const q = query(collection(db, 'usuarios'), where('uid', '==', user.uid));
       const querySnapshot = await getDocs(q);
 
@@ -36,12 +36,13 @@ function RegLogin() {
         // Almacenar el rol en localStorage
         localStorage.setItem('userRole', userData.role);
 
-        // Redirigir al usuario según su rol
+        // Redirigir al usuario a la vista correspondiente
         navigate('/gestion-usuarios');
       } else {
         throw new Error('Usuario no encontrado en Firestore.');
       }
     } catch (error) {
+      // Manejar el error de credenciales incorrectas
       setError(
         error.message.includes('deshabilitada')
           ? 'Tu cuenta está deshabilitada. Contacta al administrador.'
@@ -67,7 +68,7 @@ function RegLogin() {
           <label>Contraseña</label>
           <div className="password-container">
             <input
-              type={showPassword ? "text" : "password"}  // Muestra/oculta la contraseña
+              type={showPassword ? "text" : "password"}
               placeholder="Contraseña"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -75,7 +76,7 @@ function RegLogin() {
             <button
               type="button"
               className="show-password-btn"
-              onClick={() => setShowPassword(!showPassword)}  // Alterna la visibilidad de la contraseña
+              onClick={() => setShowPassword(!showPassword)}
             >
               {showPassword ? "Ocultar" : "Mostrar"}
             </button>
