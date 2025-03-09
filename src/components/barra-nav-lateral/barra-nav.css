@@ -5,7 +5,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 25px 15px;
+  padding: 20px 10px; /* Reducimos el padding */
   position: fixed;
   top: 0;
   left: 0;
@@ -16,125 +16,127 @@
 
 .logo {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 15px; /* Reducimos el espacio debajo del logo */
 }
 
 .logo-image {
-  width: 60px;
-  height: 60px;
+  width: 50px; /* Reducimos tamaño del logo */
+  height: 50px;
 }
 
 .logo h2 {
-  margin: 15px 0 8px;
-  font-size: 1.4em;
+  margin: 10px 0 5px;
+  font-size: 1.2em;
   color: #333;
   font-weight: bold;
 }
 
 .logo p {
   color: #666;
-  font-size: 0.95em;
+  font-size: 0.85em;
 }
 
 .user-info {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 15px; /* Reducimos espacio debajo del usuario */
 }
 
 .user-avatar {
-  width: 70px;
-  height: 70px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
-  margin-bottom: 15px;
-  border: 3px solid #c17857; /* Acento más visible */
-  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.1); /* Efecto de profundidad */
+  margin-bottom: 5px;
+  border: 2px solid #c17857; /* Borde más delgado */
+  box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .user-info h3 {
-  margin: 8px 0;
-  font-size: 1.1em;
+  margin: 5px 0;
+  font-size: 1em;
   color: #333;
 }
 
 .user-info p {
   color: #777;
-  font-size: 0.95em;
+  font-size: 0.85em;
+}
+
+/* Contenedor con scroll para los botones de navegación */
+.nav-container {
+  flex-grow: 1;
+  width: 100%;
+  overflow-y: auto; /* Habilita el scroll solo aquí */
+  max-height: calc(100vh - 200px); /* Ajustamos la altura para que no desborde */
+  padding-right: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Oculta el scrollbar en navegadores modernos */
+.nav-container::-webkit-scrollbar {
+  width: 5px;
+}
+
+.nav-container::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 5px;
 }
 
 .nav-links {
-  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 8px; /* Reducimos el espacio entre botones */
+  width: 100%;
 }
 
 .nav-button {
-  width: 90%;
-  padding: 12px 20px;
-  margin: 5px auto;
-  background-color: #4caf50; /* Verde claro */
+  width: 85%; /* Hacemos los botones un poco más pequeños */
+  padding: 10px 15px; /* Reducimos el padding interno */
+  background-color: #4caf50;
   color: white;
   border: none;
-  border-radius: 10px;
-  font-size: 1em;
+  border-radius: 8px; /* Bordes más pequeños */
+  font-size: 0.9em; /* Reducimos el tamaño de la fuente */
   cursor: pointer;
+  text-decoration: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  text-decoration: none;
   transition: background-color 0.3s ease, transform 0.2s ease;
 }
 
-.nav-button a {
-  color: inherit;
-  text-decoration: none;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.nav-button.active,
 .nav-button:hover {
-  background-color: #c17857; /* Naranja */
-  transform: scale(1.05);
-  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2); /* Sombra adicional en hover */
+  background-color: #c17857;
+  transform: scale(1.03);
+  box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.2);
 }
 
 .nav-button:active {
-  background-color: #a85d4c; /* Naranja oscuro */
+  background-color: #a85d4c;
 }
 
-.nav-button.disabled {
-  pointer-events: none;
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.disabled-button {
-  pointer-events: none;
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
+/* Ajustamos el tamaño de los botones en pantallas pequeñas */
 @media (max-width: 768px) {
   .sidebar {
     width: 220px;
-    padding: 20px 10px;
   }
 
   .logo h2 {
-    font-size: 1.1em;
+    font-size: 1em;
   }
 
   .user-avatar {
-    width: 60px;
-    height: 60px;
+    width: 50px;
+    height: 50px;
   }
 
   .nav-button {
-    font-size: 0.9em;
-    padding: 10px 15px;
+    font-size: 0.85em;
+    padding: 8px 12px;
+  }
+
+  .nav-container {
+    max-height: calc(100vh - 180px);
   }
 }

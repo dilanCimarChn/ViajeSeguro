@@ -1,20 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import {
-  collection,
-  addDoc,
-  getDocs,
-  updateDoc,
-  deleteDoc,
-  doc,
-  onSnapshot
+import {collection,addDoc,getDocs,updateDoc,deleteDoc,doc,onSnapshot
 } from 'firebase/firestore';
-import {
-  getAuth,
-  createUserWithEmailAndPassword,
-  deleteUser,
-  updatePassword,
-  signInWithEmailAndPassword,
-  signOut
+import {getAuth,createUserWithEmailAndPassword,deleteUser,updatePassword,signInWithEmailAndPassword,signOut
 } from 'firebase/auth';
 import { db } from '../../utils/firebase';
 import './gestion-usuarios.css';

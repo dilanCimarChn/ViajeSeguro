@@ -9,8 +9,23 @@ const BarraNavLateral = () => {
   const auth = getAuth();
 
   const navOptions = {
-    admin: [{ path: '/gestion-usuarios', label: 'Gestión de Usuarios' }],
-    receptionist: [],
+    admin: [
+      { path: '/gestion-usuarios', label: 'Gestión de Usuarios' },
+      { path: '/gestion-clientes', label: 'Gestión de Clientes' },
+      { path: '/gestion-conductores', label: 'Gestión de Conductores' },
+      { path: '/solicitudes-conductores', label: 'Solicitudes Conductores' },
+      { path: '/perfil-cliente', label: 'Perfil Cliente' },
+      { path: '/perfil-conductor', label: 'Perfil Conductor' },
+      { path: '/viajes-tiempo-real', label: 'Viajes en Tiempo Real' },
+      { path: '/reportes', label: 'Reportes' },
+      { path: '/configuracion', label: 'Configuración' },
+    ],
+    receptionist: [
+      { path: '/gestion-clientes', label: 'Gestión de Clientes' },
+      { path: '/gestion-conductores', label: 'Gestión de Conductores' },
+      { path: '/solicitudes-conductores', label: 'Solicitudes Conductores' },
+      { path: '/configuracion', label: 'Configuración' },
+    ],
   };
 
   const userNavOptions = navOptions[userRole] || [];
