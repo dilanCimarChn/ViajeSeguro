@@ -5,7 +5,6 @@ import RegLogin from './views/vlogin/reg-login';
 import VistaGestionUsuarios from './views/vgestion-usuarios/gestion-usuarios';
 import BarraNavLateral from './components/barra-nav-lateral/barra-nav';
 
-// Tu lógica de almacenamiento de rol
 function App() {
   const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -25,30 +24,27 @@ function App() {
       <Routes>
         {/* Rutas públicas */}
         <Route path="/" element={<BienvenidaLogin />} />
-        <Route path="/login" element={<RegLogin />} />
+        <Route path="/login" element={<RegLogin setUserRole={setUserRole} />} />
 
-        {/* Rutas protegidas con BarraNavLateral */}
-        {userRole && (
-          <Route element={<LayoutWithSidebar />}>
-            <Route path="gestion-usuarios" element={<VistaGestionUsuarios />} />
+        {/* Rutas protegidas solo si hay usuario logueado */}
+        {userRole ? (
+          <Route path="/gestion-usuarios" element={<LayoutWithSidebar />}>
+            <Route index element={<VistaGestionUsuarios />} />
           </Route>
+        ) : (
+          <Route path="*" element={<Navigate to="/login" replace />} />
         )}
-
-        {/* Redirección si la ruta no existe */}
-        <Route path="*" element={<Navigate to={userRole ? '/gestion-usuarios' : '/login'} replace />} />
       </Routes>
     </Router>
   );
 }
 
-// Componente que envuelve las rutas protegidas y muestra la Barra de Navegación.
+// Layout con barra lateral
 const LayoutWithSidebar = () => {
   return (
     <div className="app-container">
       <BarraNavLateral />
-      <Routes>
-        <Route path="gestion-usuarios" element={<VistaGestionUsuarios />} />
-      </Routes>
+      <VistaGestionUsuarios />
     </div>
   );
 };
