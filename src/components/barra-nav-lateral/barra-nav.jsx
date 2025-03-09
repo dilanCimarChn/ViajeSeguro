@@ -1,9 +1,12 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { getAuth, signOut } from 'firebase/auth';
 import './barra-nav.css';
 
 const BarraNavLateral = () => {
   const userRole = localStorage.getItem('userRole') || 'guest';
+  const navigate = useNavigate();
+  const auth = getAuth();
 
   const navOptions = {
     admin: [{ path: '/gestion-usuarios', label: 'Gestión de Usuarios' }],
@@ -11,6 +14,19 @@ const BarraNavLateral = () => {
   };
 
   const userNavOptions = navOptions[userRole] || [];
+
+  /**
+   * Cierra la sesión en Firebase, limpia el localStorage y redirige a la página de inicio de sesión.
+   */
+  const handleLogout = async () => {
+    try {
+      await signOut(auth); // Cerrar sesión en Firebase
+      localStorage.removeItem('userRole'); // Limpiar localStorage
+      navigate('/login'); // Redirigir al login
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+    }
+  };
 
   return (
     <div className="sidebar">
@@ -34,14 +50,6 @@ const BarraNavLateral = () => {
       <button className="nav-button" onClick={handleLogout}>Cerrar sesión</button>
     </div>
   );
-};
-
-/**
- * Cierra la sesión y redirige a la página de bienvenida.
- */
-const handleLogout = () => {
-  localStorage.removeItem('userRole');
-  window.location.href = '/';
 };
 
 export default BarraNavLateral;

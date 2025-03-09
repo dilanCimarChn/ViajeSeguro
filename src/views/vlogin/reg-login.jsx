@@ -1,54 +1,76 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
 import { query, where, getDocs, collection } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
 import './reg-login.css';
 
-function RegLogin() {
+function RegLogin({ setUserRole }) { // 👈 Recibe setUserRole desde App.jsx
   const navigate = useNavigate();
+  const auth = getAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(true); // Evita intentos de login mientras Firebase carga
 
-  const handleIngresarClick = async () => {
-    const auth = getAuth();
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        console.log("Usuario detectado en sesión:", user.email);
+        await validarSesion(user);
+      } else {
+        console.log("No hay usuario autenticado.");
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // ✅ Validar usuario en Firestore antes de redirigir
+  const validarSesion = async (user) => {
     try {
-      // Intentar iniciar sesión con Firebase Authentication
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      console.log('Usuario autenticado:', user);
-
-      // Verificar si el usuario existe en Firestore
-      const q = query(collection(db, 'usuarios'), where('uid', '==', user.uid));
+      const q = query(collection(db, 'usuarios'), where('email', '==', user.email));
       const querySnapshot = await getDocs(q);
 
       if (!querySnapshot.empty) {
         const userData = querySnapshot.docs[0].data();
         console.log('Datos en Firestore:', userData);
 
-        // Verificar si el usuario está activo
-        if (!userData.active) {
-          throw new Error('Tu cuenta está deshabilitada. Contacta al administrador.');
+        if (userData.active) {
+          localStorage.setItem('userRole', userData.role);
+          setUserRole(userData.role); // 👈 Actualiza el estado global
+          navigate('/gestion-usuarios');
+        } else {
+          console.error("Cuenta deshabilitada.");
+          setError("Tu cuenta está deshabilitada. Contacta al administrador.");
+          await signOut(auth);
         }
-
-        // Almacenar el rol en localStorage
-        localStorage.setItem('userRole', userData.role);
-
-        // Redirigir al usuario a la vista correspondiente
-        navigate('/gestion-usuarios');
-      } else {
-        throw new Error('Usuario no encontrado en Firestore.');
       }
     } catch (error) {
-      // Manejar el error de credenciales incorrectas
-      setError(
-        error.message.includes('deshabilitada')
-          ? 'Tu cuenta está deshabilitada. Contacta al administrador.'
-          : 'Credenciales incorrectas o cuenta no registrada en Firestore.'
-      );
-      console.error('Error en login:', error);
+      console.error("Error validando sesión:", error);
+      setError("Error validando sesión.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ Iniciar sesión manualmente
+  const handleIngresarClick = async () => {
+    try {
+      if (loading) return;
+      setError('');
+      setLoading(true);
+
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const user = userCredential.user;
+
+      console.log('Usuario autenticado:', user.email);
+      await validarSesion(user);
+    } catch (error) {
+      setError(error.message.includes('deshabilitada') ? 'Tu cuenta está deshabilitada. Contacta al administrador.' : 'Credenciales incorrectas');
+      console.error("Error en login:", error);
+      setLoading(false);
     }
   };
 
@@ -58,31 +80,32 @@ function RegLogin() {
         <h2>Iniciar Sesión</h2>
         <p className="reg-login-description">Bienvenido de nuevo, ingresa tus credenciales</p>
         <div className="reg-login-form">
-          <label>Email</label>
+          <label htmlFor="email">Email</label>
           <input
+            id="email"
+            name="email"
             type="email"
             placeholder="Correo electrónico"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
           />
-          <label>Contraseña</label>
+
+          <label htmlFor="password">Contraseña</label>
           <div className="password-container">
             <input
-              type={showPassword ? "text" : "password"}
+              id="password"
+              name="password"
+              type="password"
               placeholder="Contraseña"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
             />
-            <button
-              type="button"
-              className="show-password-btn"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? "Ocultar" : "Mostrar"}
-            </button>
           </div>
-          <button className="reg-login-button" onClick={handleIngresarClick}>
-            Ingresar
+
+          <button className="reg-login-button" onClick={handleIngresarClick} disabled={loading}>
+            {loading ? 'Cargando...' : 'Ingresar'}
           </button>
           {error && <p className="reg-login-error-text">{error}</p>}
         </div>

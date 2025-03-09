@@ -1,6 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, setDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { getAuth, createUserWithEmailAndPassword, deleteUser, updatePassword, signOut } from 'firebase/auth';
+import {
+  collection,
+  addDoc,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+  doc,
+  onSnapshot
+} from 'firebase/firestore';
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  deleteUser,
+  updatePassword,
+  signInWithEmailAndPassword,
+  signOut
+} from 'firebase/auth';
 import { db } from '../../utils/firebase';
 import './gestion-usuarios.css';
 
@@ -12,49 +27,45 @@ const GestionUsuarios = () => {
   });
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(false);
+  const auth = getAuth();
 
-  // Obtener lista de usuarios de Firestore
+  // Obtener usuarios en tiempo real desde Firestore
   useEffect(() => {
-    const fetchUsuarios = async () => {
-      const querySnapshot = await getDocs(collection(db, 'usuarios'));
-      setUsuarios(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    };
-    fetchUsuarios();
+    const unsubscribe = onSnapshot(collection(db, 'usuarios'), (snapshot) => {
+      setUsuarios(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  // Manejar cambios en los inputs
+  // Manejo de inputs
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
 
-  // Crear usuario en Firebase Authentication y almacenarlo en Firestore
+  // Crear usuario en Authentication y Firestore
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const auth = getAuth();
+    setLoading(true);
 
     try {
-      setLoading(true);
-
-      // Crear usuario en Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(
         auth,
-        formData.email,
+        formData.email.trim(),
         formData.password
       );
 
-      // Guardar datos en Firestore con el UID correcto
-      await setDoc(doc(db, 'usuarios', userCredential.user.uid), {
-        email: formData.email,
+      await addDoc(collection(db, 'usuarios'), {
+        email: formData.email.trim(),
         password: formData.password,
         role: formData.role,
         uid: userCredential.user.uid,
         active: true,
       });
 
-      setUsuarios([...usuarios, { ...formData, uid: userCredential.user.uid, active: true }]);
       setFormData({ email: '', password: '', role: 'receptionist' });
-      alert('Usuario creado exitosamente.');
+      alert('Usuario creado correctamente.');
     } catch (error) {
       console.error('Error al crear usuario:', error);
       alert('Error al crear usuario.');
@@ -63,54 +74,92 @@ const GestionUsuarios = () => {
     }
   };
 
-  // Función para habilitar/deshabilitar usuarios
-  const toggleAccountStatus = async (userId, currentStatus) => {
+  //  Cambiar contraseña en Firebase Authentication y Firestore correctamente
+  const changeUserPassword = async (userId, newPassword) => {
     try {
-      const userRef = doc(db, 'usuarios', userId);
-      await updateDoc(userRef, { active: !currentStatus });
-      setUsuarios(usuarios.map(user => user.id === userId ? { ...user, active: !currentStatus } : user));
-    } catch (error) {
-      console.error('Error al actualizar estado del usuario:', error);
-    }
-  };
-
-  // Eliminar usuario de Firestore y Firebase Authentication
-  const deleteUserAccount = async (userId) => {
-    const auth = getAuth();
-    try {
-      const userRef = doc(db, 'usuarios', userId);
-
-      // Eliminar usuario de Firebase Authentication
-      const user = auth.currentUser;
-      if (user) {
-        await deleteUser(user);  // This deletes the current user from Firebase Authentication
+      // Buscar usuario en Firestore
+      const userDoc = usuarios.find(user => user.id === userId);
+      if (!userDoc) {
+        alert('Usuario no encontrado.');
+        return;
       }
 
-      // Eliminar usuario de Firestore
-      await deleteDoc(userRef);
-      setUsuarios(usuarios.filter(user => user.id !== userId));
-      alert('Usuario eliminado con éxito.');
+      // Cerrar sesión del usuario actual antes de cambiar la contraseña
+      await signOut(auth);
+
+      //  Volver a autenticar con las credenciales del usuario que va a cambiar la contraseña
+      const userCredential = await signInWithEmailAndPassword(auth, userDoc.email, userDoc.password);
+      const user = userCredential.user;
+
+      //  Actualizar la contraseña en Firebase Authentication
+      await updatePassword(user, newPassword);
+
+      // Actualizar la nueva contraseña en Firestore
+      await updateDoc(doc(db, 'usuarios', userId), { password: newPassword });
+
+      alert(`Contraseña de ${userDoc.email} actualizada correctamente.`);
     } catch (error) {
-      console.error('Error al eliminar usuario:', error);
-      alert('Hubo un error al eliminar el usuario.');
+      console.error('Error al actualizar la contraseña:', error);
+      alert('Error al actualizar la contraseña.');
     }
   };
 
-  // Cambiar contraseña
-  const changePassword = async (userId, newPassword) => {
+  //  Habilitar / Deshabilitar usuario
+  const toggleAccountStatus = async (userId, currentStatus) => {
     try {
-      const auth = getAuth();
-      const userRef = doc(db, 'usuarios', userId);
+      await updateDoc(doc(db, 'usuarios', userId), { active: !currentStatus });
 
-      // Actualizar contraseña en Firestore
-      await updateDoc(userRef, { password: newPassword });
-
-      // Actualizar lista local
-      setUsuarios(usuarios.map(user => user.id === userId ? { ...user, password: newPassword } : user));
-
-      alert('Contraseña actualizada exitosamente.');
+      alert('Estado del usuario actualizado correctamente.');
     } catch (error) {
-      console.error('Error al actualizar la contraseña:', error);
+      console.error('Error al actualizar estado del usuario:', error);
+      alert('Error al actualizar estado del usuario.');
+    }
+  };
+
+  //  Obtener usuario por correo electrónico en Firebase Authentication
+  const getUserByEmail = async (email) => {
+    try {
+      const usersList = await getDocs(collection(db, 'usuarios'));
+      const user = usersList.docs.find(doc => doc.data().email === email);
+      return user ? user.data().uid : null;
+    } catch (error) {
+      console.error('Error obteniendo UID de usuario:', error);
+      return null;
+    }
+  };
+
+  //  Eliminar usuario sin afectar al usuario autenticado
+  const deleteUserAccount = async (userId) => {
+    try {
+      const userDoc = usuarios.find(user => user.id === userId);
+      if (!userDoc) {
+        alert('Usuario no encontrado.');
+        return;
+      }
+
+      if (auth.currentUser?.uid === userDoc.uid) {
+        alert('No puedes eliminar tu propia cuenta mientras estás logueado.');
+        return;
+      }
+
+      //  Obtener UID del usuario en Authentication
+      const userUID = await getUserByEmail(userDoc.email);
+      if (!userUID) {
+        alert('No se encontró UID del usuario en Authentication.');
+        return;
+      }
+
+      //  Eliminar usuario de Firebase Authentication
+      const userToDelete = await signInWithEmailAndPassword(auth, userDoc.email, userDoc.password);
+      await deleteUser(userToDelete.user);
+
+      //  Eliminar usuario de Firestore
+      await deleteDoc(doc(db, 'usuarios', userId));
+
+      alert(`Usuario ${userDoc.email} eliminado correctamente.`);
+    } catch (error) {
+      console.error('Error al eliminar usuario:', error);
+      alert('Error al eliminar usuario.');
     }
   };
 
@@ -118,22 +167,8 @@ const GestionUsuarios = () => {
     <div className="gestion-usuarios">
       <h2>Gestión de Usuarios</h2>
       <form onSubmit={handleSubmit} className="gestion-form">
-        <input
-          type="email"
-          name="email"
-          placeholder="Correo electrónico"
-          value={formData.email}
-          onChange={handleInputChange}
-          required
-        />
-        <input
-          type="password"
-          name="password"
-          placeholder="Contraseña"
-          value={formData.password}
-          onChange={handleInputChange}
-          required
-        />
+        <input type="email" name="email" placeholder="Correo" value={formData.email} onChange={handleInputChange} required />
+        <input type="password" name="password" placeholder="Contraseña" value={formData.password} onChange={handleInputChange} required />
         <select name="role" value={formData.role} onChange={handleInputChange}>
           <option value="receptionist">Recepcionista</option>
           <option value="admin">Administrador</option>
@@ -144,39 +179,23 @@ const GestionUsuarios = () => {
       </form>
 
       <h3>Usuarios Registrados</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Email</th>
-            <th>Rol</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {usuarios.map((usuario) => (
-            <tr key={usuario.id}>
-              <td>{usuario.email}</td>
-              <td>{usuario.role}</td>
-              <td>{usuario.active ? 'Activo' : 'Deshabilitado'}</td>
-              <td>
-                <button onClick={() => deleteUserAccount(usuario.id)}>Eliminar</button>
-                <button onClick={() => toggleAccountStatus(usuario.id, usuario.active)}>
-                  {usuario.active ? 'Deshabilitar' : 'Habilitar'}
-                </button>
-                <button
-                  onClick={() => {
-                    const newPassword = prompt('Ingrese la nueva contraseña:');
-                    if (newPassword) changePassword(usuario.id, newPassword);
-                  }}
-                >
-                  Cambiar Contraseña
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <ul>
+        {usuarios.map(user => (
+          <li key={user.id}>
+            {user.email} - {user.role} - {user.active ? 'Activo' : 'Inactivo'}
+            <button onClick={() => toggleAccountStatus(user.id, user.active)}>
+              {user.active ? 'Deshabilitar' : 'Habilitar'}
+            </button>
+            <button onClick={() => deleteUserAccount(user.id)}>Eliminar</button>
+            <button onClick={() => {
+              const newPassword = prompt(`Ingresa la nueva contraseña para ${user.email}:`);
+              if (newPassword) changeUserPassword(user.id, newPassword);
+            }}>
+              Cambiar Contraseña
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };
