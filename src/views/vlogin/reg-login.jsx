@@ -77,7 +77,7 @@ function RegLogin({ setUserRole }) { // 👈 Recibe setUserRole desde App.jsx
   return (
     <div className="reg-login-container">
       <div className="reg-login-box">
-        <h2>Iniciar Sesión</h2>
+        <h2>Iniciar Sesión prueba cono las credenciales user = ded@gmail.com  password = admin44</h2>
         <p className="reg-login-description">Bienvenido de nuevo, ingresa tus credenciales</p>
         <div className="reg-login-form">
           <label htmlFor="email">Email</label>
