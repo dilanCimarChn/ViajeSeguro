@@ -1,33 +1,112 @@
-.vista-gestion-usuarios {
-    display: flex;
-    flex-direction: row;
-    align-items: flex-start;
-    padding: 20px;
-    gap: 20px;
-    min-height: 100vh;
+.gestion-clientes {
+  max-width: 800px;
+  margin: auto;
+  padding: 20px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  font-family: Arial, sans-serif;
+}
+
+h2, h3 {
+  text-align: center;
+  color: #333;
+  font-weight: bold;
+}
+
+.gestion-form {
+  display: grid;
+  gap: 15px;
+  grid-template-columns: 1fr 1fr;
+}
+
+input, button {
+  padding: 10px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: 1px solid #cccccc;
+}
+
+button {
+  grid-column: span 2;
+  background-color: #007BFF;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+.lista-clientes {
+  margin-top: 20px;
+}
+
+.card-cliente {
+  background-color: #f8f8f8;
+  margin: 10px 0;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.card-cliente p {
+  margin: 5px 0;
+}
+
+.btn-desactivar {
+  background-color: #d9534f;
+  color: white;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.btn-activar {
+  background-color: #5cb85c;
+  color: white;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+/* Tabla de clientes */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+th, td {
+  padding: 12px;
+  text-align: center;
+  border: 1px solid #ddd;
+}
+
+button {
+  margin: 5px;
+  padding: 8px 12px;
+  background-color: #007BFF;
+  border: none;
+  color: white;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+th {
+  background-color: #007BFF;
+  color: white;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+  .gestion-form {
+      grid-template-columns: 1fr;
   }
-  
-  .vista-gestion-usuarios > .barra-nav-lateral {
-    flex: 0 0 250px;
-  }
-  
-  .vista-gestion-usuarios > .gestion-usuarios-container {
-    flex: 1;
-    max-width: calc(100% - 270px);
-    background-color: #f8f8f8;
-    padding: 20px;
-    box-sizing: border-box;
-    border-radius: 8px;
-    box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.1);
-  }
-  
-  @media (max-width: 768px) {
-    .vista-gestion-usuarios {
-      flex-direction: column;
-    }
-  
-    .vista-gestion-usuarios > .barra-nav-lateral,
-    .vista-gestion-usuarios > .gestion-usuarios-container {
-      max-width: 100%;
-    }
-  }
+}
