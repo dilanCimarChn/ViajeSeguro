@@ -10,7 +10,7 @@ const BarraNavLateral = () => {
 
   const navOptions = {
     admin: [
-      { path: '/gestion-usuarios', label: 'Gestión de Usuarios' },
+      { path: '/gestion-usuarios', label: 'Gestión de Administradores' },
       { path: '/gestion-clientes', label: 'Gestión de Clientes' },
       { path: '/gestion-conductores', label: 'Gestión de Conductores' },
       { path: '/solicitudes-conductores', label: 'Solicitudes Conductores' },

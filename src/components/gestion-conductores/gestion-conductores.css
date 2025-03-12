@@ -1,0 +1,132 @@
+/* Estilos para la Gestión de Conductores */
+.gestion-conductores {
+    max-width: 900px;
+    margin: auto;
+    padding: 20px;
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    font-family: Arial, sans-serif;
+}
+
+h2, h3 {
+    text-align: center;
+    color: #333;
+    font-weight: bold;
+}
+
+.gestion-form {
+    display: grid;
+    gap: 15px;
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 20px;
+}
+
+.gestion-form input,
+.gestion-form select,
+.gestion-form button {
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    width: 100%;
+}
+
+.gestion-form button {
+    grid-column: span 2;
+    background-color: #038C65;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.gestion-form button:hover {
+    background-color: #026848;
+}
+
+/* Estilo para la carga de archivos */
+.file-upload {
+    grid-column: span 2;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.file-upload label {
+    font-weight: bold;
+}
+
+.file-upload input {
+    flex-grow: 1;
+}
+
+/* Lista de conductores */
+.conductor-list {
+    margin-top: 20px;
+}
+
+.conductor-card {
+    background-color: #f8f8f8;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.conductor-card img {
+    width: 50px;
+    height: 50px;
+    border-radius: 6px;
+    object-fit: cover;
+    margin-left: 10px;
+}
+
+.conductor-card button {
+    padding: 8px 12px;
+    font-size: 14px;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-left: 10px;
+}
+
+.btn-habilitar {
+    background-color: #5cb85c;
+}
+
+.btn-habilitar:hover {
+    background-color: #4cae4c;
+}
+
+.btn-deshabilitar {
+    background-color: #d9534f;
+}
+
+.btn-deshabilitar:hover {
+    background-color: #c9302c;
+}
+
+.btn-eliminar {
+    background-color: #ff0000;
+}
+
+.btn-eliminar:hover {
+    background-color: #cc0000;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .gestion-form {
+        grid-template-columns: 1fr;
+    }
+
+    .gestion-form button {
+        grid-column: span 1;
+    }
+}
