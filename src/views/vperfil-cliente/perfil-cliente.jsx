@@ -7,7 +7,7 @@ const VistaPerfilCliente = () => {
   return (
     <div className="vista-perfil-cliente">
       <div className="barra-nav-lateral">
-        <BarraNavLateral />
+        <BarraNavLateral /> 
       </div>
       <div className="perfil-cliente-container">
         <PerfilCliente />
