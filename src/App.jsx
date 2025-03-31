@@ -11,7 +11,7 @@ import VistaReportes from './views/vreportes/reportes';
 import VistaConfiguracion from './views/vconfiguracion/configuracion';
 import BarraNavLateral from './components/barra-nav-lateral/barra-nav';
 
-// Layout con barra lateral - IMPORTANTE: Definimos esto primero antes de usarlo
+// Layout con barra lateral - IMPORTANTE: Definimos esto primero antes de usarlos
 const LayoutWithSidebar = ({ children }) => {
   return (
     <div className="app-container">
