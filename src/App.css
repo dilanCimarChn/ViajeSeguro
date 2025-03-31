@@ -1,0 +1,155 @@
+/* Estilos globales para la aplicación */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  body {
+    font-family: 'Arial', sans-serif;
+    background-color: #f9f9f9;
+  }
+  
+  /* Contenedor principal */
+  .app-container {
+    display: flex;
+    min-height: 100vh;
+    position: relative;
+  }
+  
+  /* Contenido principal que se ajusta según la barra lateral */
+  .content-wrapper {
+    flex: 1;
+    padding: 20px;
+    transition: margin-left var(--transition-speed) ease;
+    min-height: 100vh;
+  }
+  
+  /* Cuando se abre la barra lateral */
+  body.sidebar-open .content-wrapper {
+    margin-left: 280px;
+  }
+  
+  /* Cuando se cierra la barra lateral */
+  body.sidebar-closed .content-wrapper {
+    margin-left: 0;
+  }
+  
+  /* Media queries para pantallas pequeñas */
+  @media (max-width: 767px) {
+    body.sidebar-open .content-wrapper,
+    body.sidebar-closed .content-wrapper {
+      margin-left: 0;
+      padding: 15px;
+    }
+  }
+
+  /* Reglas adicionales para evitar superposición de barras laterales */
+
+/* Ocultar barras duplicadas */
+.sidebar:not(:first-of-type) {
+    display: none !important;
+  }
+  
+  /* Asegurar que solo hay un botón de navegación visible */
+  .sidebar-toggle-button:not(:first-of-type) {
+    display: none !important;
+  }
+  
+  /* Evitar que se dupliquen los overlays en modo móvil */
+  .sidebar-overlay:not(:first-of-type) {
+    display: none !important;
+  }
+  
+  /* Garantizar que el z-index sea correcto para evitar problemas de visualización */
+  .sidebar {
+    z-index: 1000;
+  }
+  
+  .sidebar-toggle-button {
+    z-index: 1001;
+  }
+  
+  .sidebar-overlay {
+    z-index: 999;
+  }
+  
+  /* Asegurar que el contenido principal no se superponga */
+  .content-wrapper {
+    position: relative;
+    z-index: 1;
+  }
+  
+  /* Regla para evitar que se vean múltiples barras durante la transición entre rutas */
+  body .sidebar {
+    transition: transform var(--transition-speed) ease, opacity 0.1s ease;
+  }
+  
+  /* Prevenir que aparezca más de una barra lateral */
+  body.transitioning .sidebar:not(:first-of-type) {
+    opacity: 0;
+    pointer-events: none;
+  }
+  /* 🌙 Modo oscuro */
+body.dark-mode {
+    background-color: #121212;
+    color: #f1f1f1;
+  }
+  
+  body.dark-mode .content-wrapper {
+    background-color: #1e1e1e;
+    color: #f1f1f1;
+  }
+  
+  body.dark-mode input,
+  body.dark-mode button,
+  body.dark-mode select,
+  body.dark-mode textarea {
+    background-color: #2a2a2a;
+    color: #f1f1f1;
+    border: 1px solid #444;
+  }
+  
+  body.dark-mode .config-section {
+    border-color: #333;
+  }
+  /* 🌙 Estilos para Modo Oscuro */
+body.dark-mode {
+    background-color: #121212;
+    color: #f1f1f1;
+  }
+  
+  body.dark-mode .configuracion-container {
+    background-color: #1e1e1e;
+    color: #f1f1f1;
+  }
+  
+  body.dark-mode .config-section {
+    background-color: #2a2a2a;
+    color: #f1f1f1;
+    border: 1px solid #444;
+  }
+  
+  body.dark-mode input,
+  body.dark-mode button {
+    background-color: #2c2c2c;
+    color: #f1f1f1;
+    border: 1px solid #555;
+  }
+  
+  body.dark-mode .nav-button,
+  body.dark-mode .sidebar {
+    background-color: #1f1f1f;
+    color: #f1f1f1;
+  }
+  
+  body.dark-mode .sidebar-toggle-button {
+    background-color: #333;
+    color: #fff;
+  }
+  
+  body.dark-mode .nav-button.active {
+    background-color: #333;
+    border-left: 4px solid #0af;
+  }
+  

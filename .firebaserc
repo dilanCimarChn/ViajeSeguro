@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "viajeseguro-b204d",
+    "firebase deploy": "viajeseguro-b204d"
+  },
+  "targets": {},
+  "etags": {}
+}

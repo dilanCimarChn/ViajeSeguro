@@ -1,0 +1,68 @@
+/* Estilos para el Layout principal */
+.app-container {
+    display: flex;
+    width: 100%;
+    min-height: 100vh;
+  }
+  
+  .main-content {
+    flex: 1;
+    margin-left: var(--sidebar-width);
+    padding: 20px;
+    transition: margin-left var(--transition-speed) ease;
+    background-color: #f9f9f9;
+    min-height: 100vh;
+  }
+  
+  .main-content.without-sidebar {
+    margin-left: 0;
+  }
+  
+  /* Botón para mostrar/ocultar sidebar en móviles */
+  .sidebar-toggle {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 1001;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 5px var(--shadow-color);
+    transition: all var(--transition-speed) ease;
+  }
+  
+  .sidebar-toggle:hover {
+    background-color: var(--primary-hover);
+  }
+  
+  .sidebar-toggle.active {
+    left: calc(var(--sidebar-width) - 55px);
+  }
+  
+  /* Overlay para cerrar el sidebar en móviles */
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+  }
+  
+  /* Media queries para responsividad */
+  @media (max-width: 767px) {
+    .main-content,
+    .main-content.without-sidebar {
+      margin-left: 0;
+      padding: 15px;
+      padding-top: 70px; /* Espacio para el botón de toggle */
+    }
+  }
