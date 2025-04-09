@@ -2,16 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import BienvenidaLogin from './views/vlogin/bienvenida-login';
 import RegLogin from './views/vlogin/reg-login';
-import VistaGestionUsuarios from './views/vgestion-usuarios/gestion-usuarios';
+import GestionUsuarios from './components/gestion-usuarios/gestion-usuarios.jsx'
 import VistaGestionClientes from './views/vgestion-clientes/gestion-clientes.jsx';
-import VistaGestionConductores from './views/vgestion-conductores/gestion-conductores';
+import GestionConductores from './components/gestion-conductores/gestion-conductores.jsx';
 import VistaSolicitudesConductores from './views/vsolicitudes-conductores/solicitudes-conductores';
 import VistaPerfilCliente from './views/vperfil-cliente/perfil-cliente';
-import VistaPerfilConductor from './views/vperfil-conductor/perfil-conductor';
 import VistaViajesTiempoReal from './views/vviajes-en-tiempo-real/viajes-tiempo-real';
-import VistaReportes from './views/vreportes/reportes';
+import GrabacionesCamara from './components/camara/GrabacionesCamara.jsx';
 import VistaConfiguracion from './views/vconfiguracion/configuracion';
-import BarraNavLateral from './components/barra-nav-lateral/barra-nav';
+import Reportes from './components/reportes/reportes.jsx';
+// Importar el DashboardLayout en lugar de BarraNavLateral
+import DashboardLayout from './components/barra-nav-lateral/Layout.jsx';
 
 function App() {
   const [userRole, setUserRole] = useState(null);
@@ -37,24 +38,25 @@ function App() {
         {/* Rutas protegidas según el rol */}
         {userRole === 'admin' && (
           <>
-            <Route path="/gestion-usuarios" element={<LayoutWithSidebar><VistaGestionUsuarios /></LayoutWithSidebar>} />
-            <Route path="/gestion-clientes" element={<LayoutWithSidebar><VistaGestionClientes /></LayoutWithSidebar>} />
-            <Route path="/gestion-conductores" element={<LayoutWithSidebar><VistaGestionConductores /></LayoutWithSidebar>} />
-            <Route path="/solicitudes-conductores" element={<LayoutWithSidebar><VistaSolicitudesConductores /></LayoutWithSidebar>} />
-            <Route path="/perfil-cliente" element={<LayoutWithSidebar><VistaPerfilCliente /></LayoutWithSidebar>} />
-            <Route path="/perfil-conductor" element={<LayoutWithSidebar><VistaPerfilConductor /></LayoutWithSidebar>} />
-            <Route path="/viajes-tiempo-real" element={<LayoutWithSidebar><VistaViajesTiempoReal /></LayoutWithSidebar>} />
-            <Route path="/reportes" element={<LayoutWithSidebar><VistaReportes /></LayoutWithSidebar>} />
-            <Route path="/configuracion" element={<LayoutWithSidebar><VistaConfiguracion /></LayoutWithSidebar>} />
+            <Route path="/gestion-usuarios" element={<DashboardLayout><GestionUsuarios /></DashboardLayout>} />
+            <Route path="/gestion-clientes" element={<DashboardLayout><VistaGestionClientes /></DashboardLayout>} />
+            <Route path="/gestion-conductores" element={<DashboardLayout><GestionConductores /></DashboardLayout>} />
+            <Route path="/solicitudes-conductores" element={<DashboardLayout><VistaSolicitudesConductores /></DashboardLayout>} />
+            <Route path="/perfil-cliente" element={<DashboardLayout><VistaPerfilCliente /></DashboardLayout>} />
+            <Route path="/viajes-tiempo-real" element={<DashboardLayout><VistaViajesTiempoReal /></DashboardLayout>} />
+            <Route path="/grabaciones-camara" element={<DashboardLayout><GrabacionesCamara /></DashboardLayout>} />
+            <Route path="/reportes" element={<DashboardLayout><Reportes /></DashboardLayout>} />
+            <Route path="/configuracion" element={<DashboardLayout><VistaConfiguracion /></DashboardLayout>} />
           </>
         )}
 
         {userRole === 'receptionist' && (
           <>
-            <Route path="/gestion-clientes" element={<LayoutWithSidebar><VistaGestionClientes /></LayoutWithSidebar>} />
-            <Route path="/gestion-conductores" element={<LayoutWithSidebar><VistaGestionConductores /></LayoutWithSidebar>} />
-            <Route path="/solicitudes-conductores" element={<LayoutWithSidebar><VistaSolicitudesConductores /></LayoutWithSidebar>} />
-            <Route path="/configuracion" element={<LayoutWithSidebar><VistaConfiguracion /></LayoutWithSidebar>} />
+            <Route path="/gestion-clientes" element={<DashboardLayout><VistaGestionClientes /></DashboardLayout>} />
+            <Route path="/gestion-conductores" element={<DashboardLayout><VistaGestionConductores /></DashboardLayout>} />
+            <Route path="/solicitudes-conductores" element={<DashboardLayout><VistaSolicitudesConductores /></DashboardLayout>} />
+            <Route path="/grabaciones-camara" element={<DashboardLayout><GrabacionesCamara /></DashboardLayout>} />
+            <Route path="/configuracion" element={<DashboardLayout><VistaConfiguracion /></DashboardLayout>} />
           </>
         )}
 
@@ -65,14 +67,5 @@ function App() {
   );
 }
 
-// Layout con barra lateral
-const LayoutWithSidebar = ({ children }) => {
-  return (
-    <div className="app-container">
-      <BarraNavLateral />
-      {children}
-    </div>
-  );
-};
 
 export default App;

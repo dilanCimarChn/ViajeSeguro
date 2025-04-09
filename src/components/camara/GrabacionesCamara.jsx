@@ -10,13 +10,12 @@ import {
   onSnapshot,
   Timestamp,
   doc,
-  updateDoc,
-  addDoc
+  updateDoc
 } from 'firebase/firestore';
 import L from 'leaflet';
 import { db } from '../../utils/firebase';
 import 'leaflet/dist/leaflet.css';
-import './viajes-tiempo-real.css';
+import '/Users/CAPRI/Desktop/a/ViajeSeguro/src/views/vviajes-en-tiempo-real/viajes-tiempo-real.css';
 
 // Icono personalizado para los marcadores
 const iconoVehiculo = new L.Icon({
@@ -38,164 +37,6 @@ const VistaViajesTiempoReal = () => {
   const [filtroConductor, setFiltroConductor] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [creandoDatos, setCreandoDatos] = useState(false);
-  
-  // Función para crear datos de prueba
-  const crearDatosPrueba = async () => {
-    try {
-      setCreandoDatos(true);
-      
-      // Crear conductores
-      const dilanRef = await addDoc(collection(db, 'conductores'), {
-        nombre: "Dilan Cimar",
-        email: "flaquito@gmail.com",
-        estado: "activo",
-        telefono: "123654",
-        fecha_registro: Timestamp.now(),
-        fecha_solicitud: Timestamp.now(),
-        licenciaURL: "BaseLic",
-        viajes_completados: 0
-      });
-      
-      const anaRef = await addDoc(collection(db, 'conductores'), {
-        nombre: "Ana Martínez",
-        email: "ana@example.com",
-        estado: "activo",
-        telefono: "987654",
-        fecha_registro: Timestamp.now(),
-        fecha_solicitud: Timestamp.now(),
-        licenciaURL: "BaseLic",
-        viajes_completados: 2
-      });
-      
-      const carlosRef = await addDoc(collection(db, 'conductores'), {
-        nombre: "Carlos López",
-        email: "carlos@example.com",
-        estado: "activo",
-        telefono: "456789",
-        fecha_registro: Timestamp.now(),
-        fecha_solicitud: Timestamp.now(),
-        licenciaURL: "BaseLic",
-        viajes_completados: 5
-      });
-      
-      // Crear viajes
-      await addDoc(collection(db, 'viajes'), {
-        conductor_id: dilanRef.id,
-        destino: "Centro Comercial",
-        origen: "Zona Sur",
-        estado: "pendiente",
-        fecha_inicio: Timestamp.now(),
-        fecha_actualizacion: Timestamp.now(),
-        tiempo_estimado: 15,
-        pasajero: "Juan Pérez",
-        tarifa: 25
-      });
-      
-      await addDoc(collection(db, 'viajes'), {
-        conductor_id: anaRef.id,
-        destino: "Aeropuerto",
-        origen: "Centro",
-        estado: "en_curso",
-        fecha_inicio: Timestamp.now(),
-        fecha_actualizacion: Timestamp.now(),
-        tiempo_estimado: 30,
-        pasajero: "María González",
-        tarifa: 40
-      });
-      
-      await addDoc(collection(db, 'viajes'), {
-        conductor_id: carlosRef.id,
-        destino: "Universidad",
-        origen: "Norte",
-        estado: "completado",
-        fecha_inicio: Timestamp.fromDate(new Date(Date.now() - 24*60*60*1000)),
-        fecha_actualizacion: Timestamp.now(),
-        tiempo_estimado: 0,
-        pasajero: "Roberto Méndez",
-        tarifa: 18
-      });
-      
-      await addDoc(collection(db, 'viajes'), {
-        conductor_id: dilanRef.id,
-        destino: "Hospital General",
-        origen: "Este",
-        estado: "cancelado",
-        fecha_inicio: Timestamp.fromDate(new Date(Date.now() - 2*24*60*60*1000)),
-        fecha_actualizacion: Timestamp.now(),
-        tiempo_estimado: 0,
-        pasajero: "Laura Sánchez",
-        tarifa: 35
-      });
-      
-      // Crear posiciones
-      await addDoc(collection(db, 'posiciones_conductores'), {
-        conductor_id: dilanRef.id,
-        lat: -16.505,
-        lng: -68.130,
-        velocidad: 30,
-        disponible: true,
-        timestamp: Timestamp.now()
-      });
-      
-      await addDoc(collection(db, 'posiciones_conductores'), {
-        conductor_id: anaRef.id,
-        lat: -16.510,
-        lng: -68.125,
-        velocidad: 0,
-        disponible: true,
-        timestamp: Timestamp.now()
-      });
-      
-      await addDoc(collection(db, 'posiciones_conductores'), {
-        conductor_id: carlosRef.id,
-        lat: -16.500,
-        lng: -68.140,
-        velocidad: 45,
-        disponible: false,
-        timestamp: Timestamp.now()
-      });
-      
-      // Crear datos históricos para la gráfica
-      const hoy = new Date();
-      for (let i = 6; i >= 0; i--) {
-        const fecha = new Date(hoy);
-        fecha.setDate(hoy.getDate() - i);
-        
-        // Crear entre 5 y 15 viajes aleatorios por día
-        const numViajes = Math.floor(Math.random() * 10) + 5;
-        
-        for (let j = 0; j < numViajes; j++) {
-          const conductorId = [dilanRef.id, anaRef.id, carlosRef.id][Math.floor(Math.random() * 3)];
-          const estados = ['completado', 'cancelado'];
-          const estado = estados[Math.floor(Math.random() * estados.length)];
-          
-          // Hora aleatoria dentro del día
-          const horaAleatoria = new Date(fecha);
-          horaAleatoria.setHours(Math.floor(Math.random() * 24), Math.floor(Math.random() * 60));
-          
-          await addDoc(collection(db, 'viajes'), {
-            conductor_id: conductorId,
-            destino: ["Centro Comercial", "Aeropuerto", "Universidad", "Hospital", "Parque"][Math.floor(Math.random() * 5)],
-            origen: ["Zona Sur", "Zona Norte", "Centro", "Este", "Oeste"][Math.floor(Math.random() * 5)],
-            estado: estado,
-            fecha_inicio: Timestamp.fromDate(horaAleatoria),
-            fecha_actualizacion: Timestamp.fromDate(horaAleatoria),
-            tiempo_estimado: 0,
-            pasajero: "Cliente " + j,
-            tarifa: Math.floor(Math.random() * 40) + 10
-          });
-        }
-      }
-      
-      alert("Datos de prueba creados exitosamente");
-      setCreandoDatos(false);
-    } catch (error) {
-      console.error("Error al crear datos de prueba:", error);
-      alert("Error al crear datos de prueba: " + error.message);
-      setCreandoDatos(false);
-    }
-  };
   
   // Cargar conductores
   useEffect(() => {
@@ -571,22 +412,9 @@ const VistaViajesTiempoReal = () => {
             ))}
           </select>
         </div>
-        <div className="acciones">
-          <button 
-            onClick={crearDatosPrueba} 
-            className="btn-secundario" 
-            disabled={creandoDatos}
-          >
-            {creandoDatos ? 'Creando datos...' : 'Crear datos de prueba'}
-          </button>
-          <button 
-            onClick={agregarNuevoViaje} 
-            className="btn-principal" 
-            disabled={loading || conductores.length === 0}
-          >
-            {loading ? 'Cargando...' : 'Nuevo Viaje (Demo)'}
-          </button>
-        </div>
+        <button onClick={agregarNuevoViaje} className="btn-principal" disabled={loading}>
+          {loading ? 'Cargando...' : 'Nuevo Viaje (Demo)'}
+        </button>
       </div>
       
       {/* Mapa de posiciones */}
