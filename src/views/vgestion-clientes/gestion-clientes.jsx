@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   collection, 
-  addDoc, 
   updateDoc, 
-  deleteDoc, 
   doc, 
   onSnapshot, 
   getDoc,
@@ -18,21 +16,9 @@ import { db } from '../../utils/firebase';
 import './gestion-clientes.css';
 
 const GestionClientes = () => {
-  // Estado para el formulario
-  const [formData, setFormData] = useState({
-    nombre: '',
-    email: '',
-    telefono: '',
-    direccion: '',
-    activo: true,
-    fechaRegistro: new Date().toISOString()
-  });
-
   // Estados para gestionar clientes
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [editMode, setEditMode] = useState(false);
-  const [currentClienteId, setCurrentClienteId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showDetails, setShowDetails] = useState({});
   
@@ -43,6 +29,16 @@ const GestionClientes = () => {
   const [comentariosConductores, setComentariosConductores] = useState([]);
   const [activeTab, setActiveTab] = useState('info');
   const [nuevoComentario, setNuevoComentario] = useState('');
+  
+  // Estados para el modal de edición
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [clienteEdit, setClienteEdit] = useState({
+    nombre: '',
+    email: '',
+    telefono: '',
+    direccion: '',
+    activo: true
+  });
 
   // Obtener clientes de Firebase
   useEffect(() => {
@@ -56,85 +52,6 @@ const GestionClientes = () => {
     return () => unsubscribe();
   }, []);
 
-  // Manejador de cambios en el formulario
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData({ 
-      ...formData, 
-      [name]: type === 'checkbox' ? checked : value 
-    });
-  };
-
-  // Crear o actualizar cliente
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!formData.nombre || !formData.email || !formData.telefono) {
-      alert('Los campos Nombre, Email y Teléfono son obligatorios.');
-      return;
-    }
-
-    setLoading(true);
-    
-    try {
-      if (editMode && currentClienteId) {
-        // Actualizar cliente existente
-        await updateDoc(doc(db, 'clientes', currentClienteId), {
-          ...formData,
-          fechaActualizacion: new Date().toISOString()
-        });
-        alert('Cliente actualizado correctamente.');
-      } else {
-        // Verificar si el email ya existe
-        const emailQuery = query(collection(db, 'clientes'), where('email', '==', formData.email));
-        const emailSnapshot = await getDocs(emailQuery);
-        
-        if (!emailSnapshot.empty) {
-          alert('Ya existe un cliente con este correo electrónico.');
-          setLoading(false);
-          return;
-        }
-        
-        // Crear nuevo cliente
-        const docRef = await addDoc(collection(db, 'clientes'), formData);
-        
-        // Creamos automáticamente la colección de historial de viajes y comentarios
-        await addDoc(collection(db, 'viajes'), {
-          clienteId: docRef.id,
-          fecha: Timestamp.now(),
-          origen: 'Registro inicial',
-          destino: 'N/A',
-          estado: 'completado',
-          calificacion: 5
-        });
-        
-        alert('Cliente agregado correctamente.');
-      }
-      
-      // Resetear el formulario
-      resetForm();
-    } catch (error) {
-      console.error('Error al procesar cliente:', error);
-      alert(`Error: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Resetear formulario
-  const resetForm = () => {
-    setFormData({
-      nombre: '',
-      email: '',
-      telefono: '',
-      direccion: '',
-      activo: true,
-      fechaRegistro: new Date().toISOString()
-    });
-    setEditMode(false);
-    setCurrentClienteId(null);
-  };
-
   // Cambiar estado de activación de cliente
   const toggleAccountStatus = async (clienteId, currentStatus) => {
     try {
@@ -142,74 +59,91 @@ const GestionClientes = () => {
         activo: !currentStatus,
         fechaActualizacion: new Date().toISOString()
       });
-      alert(`Cliente ${!currentStatus ? 'activado' : 'desactivado'} correctamente.`);
+      
+      // Actualizar el estado local inmediatamente para mejor UX
+      setClientes(prevClientes => 
+        prevClientes.map(cliente => 
+          cliente.id === clienteId 
+            ? {...cliente, activo: !currentStatus} 
+            : cliente
+        )
+      );
+      
+      // Mostrar una notificación de éxito más elegante
+      const mensaje = !currentStatus ? 'Cliente activado correctamente' : 'Cliente desactivado correctamente';
+      mostrarNotificacion(mensaje, 'success');
     } catch (error) {
       console.error('Error al actualizar estado:', error);
-      alert('Error al actualizar estado del cliente.');
+      mostrarNotificacion('Error al actualizar estado del cliente', 'error');
     }
   };
 
-  // Eliminar cliente
-  const deleteCliente = async (clienteId) => {
-    if (window.confirm('¿Está seguro que desea eliminar este cliente? Esta acción no se puede deshacer.')) {
-      try {
-        // Verificar si tiene viajes asociados
-        const viajesQuery = query(collection(db, 'viajes'), where('clienteId', '==', clienteId));
-        const viajesSnapshot = await getDocs(viajesQuery);
-        
-        if (!viajesSnapshot.empty) {
-          if (!window.confirm('Este cliente tiene viajes asociados. ¿Desea eliminarlo de todas formas?')) {
-            return;
-          }
-          
-          // Eliminar todos los viajes asociados
-          for (const doc of viajesSnapshot.docs) {
-            await deleteDoc(doc.ref);
-          }
-        }
-        
-        // Eliminar comentarios asociados
-        const comentariosQuery = query(collection(db, 'comentarios'), where('clienteId', '==', clienteId));
-        const comentariosSnapshot = await getDocs(comentariosQuery);
-        
-        for (const doc of comentariosSnapshot.docs) {
-          await deleteDoc(doc.ref);
-        }
-        
-        // Finalmente eliminar el cliente
-        await deleteDoc(doc(db, 'clientes', clienteId));
-        alert('Cliente eliminado correctamente.');
-      } catch (error) {
-        console.error('Error al eliminar cliente:', error);
-        alert('Error al eliminar cliente.');
-      }
-    }
-  };
-
-  // Cargar cliente para editar
-  const loadClienteForEdit = async (clienteId) => {
-    try {
-      const clienteDoc = await getDoc(doc(db, 'clientes', clienteId));
-      
-      if (clienteDoc.exists()) {
-        setFormData(clienteDoc.data());
-        setEditMode(true);
-        setCurrentClienteId(clienteId);
-      } else {
-        alert('El cliente no existe.');
-      }
-    } catch (error) {
-      console.error('Error al cargar cliente:', error);
-      alert('Error al cargar datos del cliente.');
-    }
-  };
-  
   // Toggle para mostrar detalles
   const toggleDetails = (clienteId) => {
     setShowDetails(prev => ({
       ...prev,
       [clienteId]: !prev[clienteId]
     }));
+  };
+
+  // Cargar cliente para editar
+  const openEditModal = async (clienteId) => {
+    try {
+      const clienteDoc = await getDoc(doc(db, 'clientes', clienteId));
+      
+      if (clienteDoc.exists()) {
+        setClienteEdit({
+          id: clienteId,
+          ...clienteDoc.data()
+        });
+        setShowEditModal(true);
+      } else {
+        mostrarNotificacion('El cliente no existe en la base de datos', 'error');
+      }
+    } catch (error) {
+      console.error('Error al cargar cliente:', error);
+      mostrarNotificacion('Error al cargar datos del cliente', 'error');
+    }
+  };
+  
+  // Guardar cambios de edición
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    
+    if (!clienteEdit.nombre || !clienteEdit.email || !clienteEdit.telefono) {
+      mostrarNotificacion('Los campos Nombre, Email y Teléfono son obligatorios', 'warning');
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      await updateDoc(doc(db, 'clientes', clienteEdit.id), {
+        nombre: clienteEdit.nombre,
+        email: clienteEdit.email,
+        telefono: clienteEdit.telefono,
+        direccion: clienteEdit.direccion,
+        activo: clienteEdit.activo,
+        fechaActualizacion: new Date().toISOString()
+      });
+      
+      // Actualizar el estado local para mejor UX
+      setClientes(prevClientes => 
+        prevClientes.map(cliente => 
+          cliente.id === clienteEdit.id 
+            ? {...cliente, ...clienteEdit, fechaActualizacion: new Date().toISOString()} 
+            : cliente
+        )
+      );
+      
+      setShowEditModal(false);
+      mostrarNotificacion('Cliente actualizado correctamente', 'success');
+    } catch (error) {
+      console.error('Error al actualizar cliente:', error);
+      mostrarNotificacion(`Error: ${error.message}`, 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Ver perfil de cliente
@@ -221,7 +155,7 @@ const GestionClientes = () => {
       const clienteDoc = await getDoc(doc(db, 'clientes', clienteId));
       
       if (!clienteDoc.exists()) {
-        alert('El cliente no existe en la base de datos.');
+        mostrarNotificacion('El cliente no existe en la base de datos', 'error');
         setLoading(false);
         return;
       }
@@ -267,7 +201,7 @@ const GestionClientes = () => {
       setLoading(false);
     } catch (error) {
       console.error('Error al cargar perfil:', error);
-      alert('Error al cargar perfil del cliente.');
+      mostrarNotificacion('Error al cargar perfil del cliente', 'error');
       setLoading(false);
     }
   };
@@ -277,7 +211,7 @@ const GestionClientes = () => {
     e.preventDefault();
     
     if (!nuevoComentario.trim()) {
-      alert('Por favor, escriba un comentario.');
+      mostrarNotificacion('Por favor, escriba un comentario', 'warning');
       return;
     }
     
@@ -311,10 +245,10 @@ const GestionClientes = () => {
       
       setComentariosConductores(comentariosData);
       
-      alert('Comentario añadido correctamente.');
+      mostrarNotificacion('Comentario añadido correctamente', 'success');
     } catch (error) {
       console.error('Error al añadir comentario:', error);
-      alert('Error al añadir comentario.');
+      mostrarNotificacion('Error al añadir comentario', 'error');
     }
   };
 
@@ -333,6 +267,31 @@ const GestionClientes = () => {
     });
   };
 
+  // Sistema de notificaciones
+  const [notificacion, setNotificacion] = useState({ visible: false, mensaje: '', tipo: '' });
+  
+  const mostrarNotificacion = (mensaje, tipo = 'info') => {
+    setNotificacion({
+      visible: true,
+      mensaje,
+      tipo
+    });
+    
+    // Auto-ocultar después de 3 segundos
+    setTimeout(() => {
+      setNotificacion(prev => ({ ...prev, visible: false }));
+    }, 3000);
+  };
+
+  // Manejador de cambios en el formulario de edición
+  const handleEditChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setClienteEdit(prev => ({ 
+      ...prev, 
+      [name]: type === 'checkbox' ? checked : value 
+    }));
+  };
+
   // Filtrar clientes por término de búsqueda
   const filteredClientes = clientes.filter(cliente => 
     cliente.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -341,443 +300,504 @@ const GestionClientes = () => {
   );
 
   return (
-    <div className="gestion-clientes">
-      <h2>{editMode ? 'Editar Cliente' : 'Añadir Nuevo Cliente'}</h2>
-      
-      <form onSubmit={handleSubmit} className="gestion-form">
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="nombre">Nombre Completo</label>
-            <input 
-              type="text" 
-              id="nombre"
-              name="nombre" 
-              placeholder="Nombre Completo" 
-              value={formData.nombre} 
-              onChange={handleInputChange} 
-              required 
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="email">Correo Electrónico</label>
-            <input 
-              type="email" 
-              id="email"
-              name="email" 
-              placeholder="Correo Electrónico" 
-              value={formData.email} 
-              onChange={handleInputChange} 
-              required 
-            />
-          </div>
-        </div>
-        
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="telefono">Teléfono</label>
-            <input 
-              type="tel" 
-              id="telefono"
-              name="telefono" 
-              placeholder="Teléfono" 
-              value={formData.telefono} 
-              onChange={handleInputChange} 
-              required 
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="direccion">Dirección</label>
-            <input 
-              type="text" 
-              id="direccion"
-              name="direccion" 
-              placeholder="Dirección" 
-              value={formData.direccion} 
-              onChange={handleInputChange} 
-            />
-          </div>
-        </div>
-        
-        <div className="form-row">
-          <div className="checkbox-container">
-            <label>
-              <input 
-                type="checkbox" 
-                name="activo" 
-                checked={formData.activo} 
-                onChange={handleInputChange} 
-              />
-              Cliente Activo
-            </label>
-          </div>
-        </div>
-        
-        <div className="form-buttons">
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Procesando...' : (editMode ? 'Actualizar Cliente' : 'Agregar Cliente')}
-          </button>
-          
-          {editMode && (
-            <button type="button" onClick={resetForm} className="btn-cancel">
-              Cancelar
-            </button>
-          )}
-        </div>
-      </form>
-      
-      <div className="search-container">
-        <h3>Clientes Registrados</h3>
-        <input
-          type="text"
-          placeholder="Buscar por nombre, email o teléfono"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="search-input"
-        />
+    <div className="gestion-clientes-container">
+      {/* Encabezado de sección */}
+      <div className="section-header">
+        <h2>Panel de Gestión de Clientes</h2>
+        <div className="green-underline"></div>
       </div>
       
-      {loading && <p className="loading-message">Cargando clientes...</p>}
-      
-      {!loading && filteredClientes.length === 0 && (
-        <p className="no-results">No hay clientes que coincidan con la búsqueda.</p>
-      )}
-      
-      {!loading && filteredClientes.length > 0 && (
-        <>
-          {/* Vista de escritorio: Tabla */}
-          <div className="tabla-container desktop-view">
-            <table className="tabla-clientes">
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Email</th>
-                  <th>Teléfono</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredClientes.map(cliente => (
-                  <React.Fragment key={cliente.id}>
-                    <tr className={cliente.activo ? 'cliente-activo' : 'cliente-inactivo'}>
-                      <td>{cliente.nombre}</td>
-                      <td>{cliente.email}</td>
-                      <td>{cliente.telefono}</td>
-                      <td>
-                        <span className={`status-badge ${cliente.activo ? 'active' : 'inactive'}`}>
-                          {cliente.activo ? 'Activo' : 'Inactivo'}
-                        </span>
-                      </td>
-                      <td className="actions-cell">
-                        <button 
-                          onClick={() => toggleDetails(cliente.id)} 
-                          className="btn-details"
-                          aria-label="Ver detalles"
-                          title="Ver detalles"
-                        >
-                          <i className="fa fa-info-circle"></i>
-                        </button>
-                        <button 
-                          onClick={() => loadClienteForEdit(cliente.id)} 
-                          className="btn-edit"
-                          aria-label="Editar cliente"
-                          title="Editar cliente"
-                        >
-                          <i className="fa fa-pencil"></i>
-                        </button>
-                        <button 
-                          onClick={() => toggleAccountStatus(cliente.id, cliente.activo)} 
-                          className={cliente.activo ? 'btn-deactivate' : 'btn-activate'}
-                          aria-label={cliente.activo ? 'Desactivar cliente' : 'Activar cliente'}
-                          title={cliente.activo ? 'Desactivar cliente' : 'Activar cliente'}
-                        >
-                          <i className={cliente.activo ? "fa fa-toggle-on" : "fa fa-toggle-off"}></i>
-                        </button>
-                        <button 
-                          onClick={() => deleteCliente(cliente.id)} 
-                          className="btn-delete"
-                          aria-label="Eliminar cliente"
-                          title="Eliminar cliente"
-                        >
-                          <i className="fa fa-trash"></i>
-                        </button>
-                        <button 
-                          onClick={() => verPerfil(cliente.id)} 
-                          className="btn-perfil"
-                          aria-label="Ver perfil completo"
-                          title="Ver perfil completo"
-                        >
-                          <i className="fa fa-user"></i>
-                        </button>
-                      </td>
-                    </tr>
-                    
-                    {/* Fila expandible con detalles */}
-                    {showDetails[cliente.id] && (
-                      <tr className="details-row">
-                        <td colSpan="5">
-                          <div className="cliente-details">
-                            <p><strong>Dirección:</strong> {cliente.direccion || 'No especificada'}</p>
-                            <p><strong>Fecha de Registro:</strong> {
-                              cliente.fechaRegistro ? 
-                                formatDate(cliente.fechaRegistro) : 
-                                'Fecha desconocida'
-                            }</p>
-                            {cliente.fechaActualizacion && (
-                              <p><strong>Última Actualización:</strong> {
-                                formatDate(cliente.fechaActualizacion)
-                              }</p>
-                            )}
+      {/* Barra de búsqueda */}
+      <div className="clients-section">
+        <div className="search-bar">
+          <input
+            type="text"
+            placeholder="Buscar por nombre, email o teléfono"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-input"
+          />
+        </div>
+        
+        {loading && (
+          <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p className="loading-message">Cargando clientes...</p>
+          </div>
+        )}
+        
+        {!loading && filteredClientes.length === 0 && (
+          <div className="no-results">
+            <i className="fa fa-exclamation-circle"></i>
+            <p>No hay clientes que coincidan con la búsqueda.</p>
+          </div>
+        )}
+        
+        {!loading && filteredClientes.length > 0 && (
+          <>
+            {/* Vista de escritorio: Tabla */}
+            <div className="desktop-view">
+              <table className="clients-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Email</th>
+                    <th>Teléfono</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredClientes.map(cliente => (
+                    <React.Fragment key={cliente.id}>
+                      <tr className={cliente.activo ? 'row-active' : 'row-inactive'}>
+                        <td>{cliente.nombre}</td>
+                        <td>{cliente.email}</td>
+                        <td>{cliente.telefono}</td>
+                        <td>
+                          <span className={`status-badge ${cliente.activo ? 'active' : 'inactive'}`}>
+                            {cliente.activo ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="action-buttons">
+                            <button 
+                              onClick={() => toggleDetails(cliente.id)} 
+                              className="btn-table-action btn-details"
+                            >
+                              <i className="fa fa-info-circle"></i>
+                              <span>Detalles</span>
+                            </button>
+                            <button 
+                              onClick={() => openEditModal(cliente.id)} 
+                              className="btn-table-action btn-edit"
+                            >
+                              <i className="fa fa-pencil"></i>
+                              <span>Editar</span>
+                            </button>
+                            <button 
+                              onClick={() => toggleAccountStatus(cliente.id, cliente.activo)} 
+                              className={`btn-table-action ${cliente.activo ? 'btn-deactivate' : 'btn-activate'}`}
+                            >
+                              <i className={cliente.activo ? "fa fa-toggle-on" : "fa fa-toggle-off"}></i>
+                              <span>{cliente.activo ? 'Desactivar' : 'Activar'}</span>
+                            </button>
+                            <button 
+                              onClick={() => verPerfil(cliente.id)} 
+                              className="btn-table-action btn-profile"
+                            >
+                              <i className="fa fa-user"></i>
+                              <span>Perfil</span>
+                            </button>
                           </div>
                         </td>
                       </tr>
-                    )}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          
-          {/* Vista móvil: Tarjetas */}
-          <div className="mobile-view">
-            {filteredClientes.map(cliente => (
-              <div 
-                key={cliente.id} 
-                className={`cliente-card ${cliente.activo ? 'card-activo' : 'card-inactivo'}`}
-              >
-                <div className="card-header">
-                  <h4>{cliente.nombre}</h4>
-                  <span className={`status-badge ${cliente.activo ? 'active' : 'inactive'}`}>
-                    {cliente.activo ? 'Activo' : 'Inactivo'}
-                  </span>
-                </div>
-                
-                <div className="card-body">
-                  <p><i className="fa fa-envelope"></i> {cliente.email}</p>
-                  <p><i className="fa fa-phone"></i> {cliente.telefono}</p>
-                  {showDetails[cliente.id] && (
-                    <div className="card-details">
-                      <p><i className="fa fa-map-marker"></i> {cliente.direccion || 'Dirección no especificada'}</p>
-                      <p><i className="fa fa-calendar"></i> Registro: {
-                        cliente.fechaRegistro ? 
-                          formatDate(cliente.fechaRegistro) : 
-                          'Fecha desconocida'
-                      }</p>
-                      {cliente.fechaActualizacion && (
-                        <p><i className="fa fa-refresh"></i> Actualización: {
-                          formatDate(cliente.fechaActualizacion)
-                        }</p>
+                      
+                      {/* Fila expandible con detalles */}
+                      {showDetails[cliente.id] && (
+                        <tr className="details-row">
+                          <td colSpan="5">
+                            <div className="client-details">
+                              <p><strong>Dirección:</strong> {cliente.direccion || 'No especificada'}</p>
+                              <p><strong>Fecha de Registro:</strong> {
+                                cliente.fechaRegistro ? 
+                                  formatDate(cliente.fechaRegistro) : 
+                                  'Fecha desconocida'
+                              }</p>
+                              {cliente.fechaActualizacion && (
+                                <p><strong>Última Actualización:</strong> {
+                                  formatDate(cliente.fechaActualizacion)
+                                }</p>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
                       )}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Vista móvil: Tarjetas */}
+            <div className="mobile-view">
+              {filteredClientes.map(cliente => (
+                <div 
+                  key={cliente.id} 
+                  className={`client-card ${cliente.activo ? 'card-active' : 'card-inactive'}`}
+                >
+                  <div className="card-header">
+                    <h3>{cliente.nombre}</h3>
+                    <span className={`status-badge ${cliente.activo ? 'active' : 'inactive'}`}>
+                      {cliente.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </div>
+                  
+                  <div className="card-body">
+                    <p><i className="fa fa-envelope"></i> {cliente.email}</p>
+                    <p><i className="fa fa-phone"></i> {cliente.telefono}</p>
+                    
+                    {showDetails[cliente.id] && (
+                      <div className="card-expanded">
+                        <p><i className="fa fa-map-marker"></i> {cliente.direccion || 'Dirección no especificada'}</p>
+                        <p><i className="fa fa-calendar"></i> Registro: {
+                          cliente.fechaRegistro ? 
+                            formatDate(cliente.fechaRegistro) : 
+                            'Fecha desconocida'
+                        }</p>
+                        {cliente.fechaActualizacion && (
+                          <p><i className="fa fa-refresh"></i> Actualización: {
+                            formatDate(cliente.fechaActualizacion)
+                          }</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="card-actions">
+                    <button 
+                      onClick={() => toggleDetails(cliente.id)} 
+                      className="btn-card-action"
+                    >
+                      {showDetails[cliente.id] ? 'Ocultar detalles' : 'Ver detalles'}
+                    </button>
+                    
+                    <div className="card-buttons">
+                      <button 
+                        onClick={() => openEditModal(cliente.id)} 
+                        className="btn-card-action btn-edit"
+                      >
+                        <i className="fa fa-pencil"></i>
+                        Editar Cliente
+                      </button>
+                      <button 
+                        onClick={() => toggleAccountStatus(cliente.id, cliente.activo)} 
+                        className={`btn-card-action ${cliente.activo ? 'btn-deactivate' : 'btn-activate'}`}
+                      >
+                        <i className={cliente.activo ? "fa fa-toggle-on" : "fa fa-toggle-off"}></i>
+                        {cliente.activo ? 'Desactivar Cliente' : 'Activar Cliente'}
+                      </button>
+                      <button 
+                        onClick={() => verPerfil(cliente.id)} 
+                        className="btn-card-action btn-profile"
+                      >
+                        <i className="fa fa-user"></i>
+                        Ver Perfil Completo
+                      </button>
                     </div>
-                  )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+      
+      {/* Sistema de notificaciones */}
+      {notificacion.visible && (
+        <div className={`notification notification-${notificacion.tipo}`}>
+          <span className="notification-message">{notificacion.mensaje}</span>
+          <button 
+            className="notification-close" 
+            onClick={() => setNotificacion(prev => ({ ...prev, visible: false }))}
+          >
+            <i className="fa fa-times"></i>
+          </button>
+        </div>
+      )}
+      
+      {/* Modal de edición de cliente */}
+      {showEditModal && (
+        <div className="modal-overlay">
+          <div className="modal-container">
+            <div className="modal-header">
+              <h3>Editar Cliente</h3>
+              <button 
+                className="close-button" 
+                onClick={() => setShowEditModal(false)}
+              >
+                &times;
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              <form onSubmit={handleSaveEdit}>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label htmlFor="nombre">Nombre Completo</label>
+                    <input 
+                      type="text" 
+                      id="nombre"
+                      name="nombre" 
+                      value={clienteEdit.nombre || ''} 
+                      onChange={handleEditChange} 
+                      required 
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="email">Correo Electrónico</label>
+                    <input 
+                      type="email" 
+                      id="email"
+                      name="email" 
+                      value={clienteEdit.email || ''} 
+                      onChange={handleEditChange} 
+                      required 
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="telefono">Teléfono</label>
+                    <input 
+                      type="tel" 
+                      id="telefono"
+                      name="telefono" 
+                      value={clienteEdit.telefono || ''} 
+                      onChange={handleEditChange} 
+                      required 
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="direccion">Dirección</label>
+                    <input 
+                      type="text" 
+                      id="direccion"
+                      name="direccion" 
+                      value={clienteEdit.direccion || ''} 
+                      onChange={handleEditChange} 
+                    />
+                  </div>
                 </div>
                 
-                <div className="card-actions">
-                  <button 
-                    onClick={() => toggleDetails(cliente.id)} 
-                    className="btn-details"
-                  >
-                    {showDetails[cliente.id] ? 'Ocultar' : 'Detalles'}
+                <div className="form-checkbox">
+                  <label>
+                    <input 
+                      type="checkbox" 
+                      name="activo" 
+                      checked={clienteEdit.activo || false} 
+                      onChange={handleEditChange} 
+                    />
+                    Cliente Activo
+                  </label>
+                </div>
+                
+                <div className="modal-footer">
+                  <button type="button" onClick={() => setShowEditModal(false)} className="btn-cancel">
+                    Cancelar
                   </button>
-                  <button 
-                    onClick={() => loadClienteForEdit(cliente.id)} 
-                    className="btn-edit"
-                  >
-                    Editar
-                  </button>
-                  <button 
-                    onClick={() => toggleAccountStatus(cliente.id, cliente.activo)} 
-                    className={cliente.activo ? 'btn-deactivate' : 'btn-activate'}
-                  >
-                    {cliente.activo ? 'Desactivar' : 'Activar'}
-                  </button>
-                  <button 
-                    onClick={() => deleteCliente(cliente.id)} 
-                    className="btn-delete"
-                  >
-                    Eliminar
-                  </button>
-                  <button 
-                    onClick={() => verPerfil(cliente.id)} 
-                    className="btn-perfil"
-                  >
-                    Ver Perfil
+                  <button type="submit" className="btn-save" disabled={loading}>
+                    {loading ? 'Guardando...' : 'Guardar Cambios'}
                   </button>
                 </div>
-              </div>
-            ))}
+              </form>
+            </div>
           </div>
-        </>
+        </div>
       )}
       
       {/* Modal para Perfil de Cliente */}
       {showPerfilModal && selectedCliente && (
-        <div className="perfil-modal">
-          <div className="perfil-modal-content">
-            <div className="perfil-modal-header">
+        <div className="profile-modal">
+          <div className="modal-content">
+            <div className="modal-header">
               <h3>Perfil del Cliente</h3>
               <button 
-                className="close-btn" 
+                className="close-button" 
                 onClick={() => setShowPerfilModal(false)}
               >
                 &times;
               </button>
             </div>
             
-            <div className="perfil-modal-body">
-              {/* Tabs de navegación */}
-              <div className="perfil-tabs">
-                <button 
-                  className={`tab-btn ${activeTab === 'info' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('info')}
-                >
-                  Información
-                </button>
-                <button 
-                  className={`tab-btn ${activeTab === 'viajes' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('viajes')}
-                >
-                  Historial de Viajes
-                </button>
-                <button 
-                  className={`tab-btn ${activeTab === 'comentarios' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('comentarios')}
-                >
-                  Comentarios
-                </button>
-              </div>
-              
-              {/* Contenido de las tabs */}
-              <div className="tab-content">
-                {/* Tab de Información */}
-                {activeTab === 'info' && (
-                  <div className="info-tab">
-                    <div className="info-card">
-                      <h4>Datos Personales</h4>
-                      <p><strong>Nombre:</strong> {selectedCliente.nombre}</p>
-                      <p><strong>Email:</strong> {selectedCliente.email}</p>
-                      <p><strong>Teléfono:</strong> {selectedCliente.telefono}</p>
-                      <p><strong>Dirección:</strong> {selectedCliente.direccion || 'No especificada'}</p>
-                      <p><strong>Estado:</strong> {selectedCliente.activo ? 'Activo' : 'Inactivo'}</p>
-                      <p><strong>Fecha de Registro:</strong> {
-                        selectedCliente.fechaRegistro ? 
-                          formatDate(selectedCliente.fechaRegistro) : 
-                          'Fecha desconocida'
-                      }</p>
+            <div className="modal-tabs">
+              <button 
+                className={`tab-button ${activeTab === 'info' ? 'active' : ''}`}
+                onClick={() => setActiveTab('info')}
+              >
+                Información
+              </button>
+              <button 
+                className={`tab-button ${activeTab === 'viajes' ? 'active' : ''}`}
+                onClick={() => setActiveTab('viajes')}
+              >
+                Historial de Viajes
+              </button>
+              <button 
+                className={`tab-button ${activeTab === 'comentarios' ? 'active' : ''}`}
+                onClick={() => setActiveTab('comentarios')}
+              >
+                Comentarios
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              {/* Tab de Información */}
+              {activeTab === 'info' && (
+                <div className="info-tab">
+                  <div className="info-section">
+                    <h4>Datos Personales</h4>
+                    <div className="info-grid">
+                      <div className="info-item">
+                        <span className="info-label">Nombre:</span>
+                        <span className="info-value">{selectedCliente.nombre}</span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">Email:</span>
+                        <span className="info-value">{selectedCliente.email}</span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">Teléfono:</span>
+                        <span className="info-value">{selectedCliente.telefono}</span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">Dirección:</span>
+                        <span className="info-value">{selectedCliente.direccion || 'No especificada'}</span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">Estado:</span>
+                        <span className="info-value">
+                          <span className={`status-badge ${selectedCliente.activo ? 'active' : 'inactive'}`}>
+                            {selectedCliente.activo ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">Fecha de Registro:</span>
+                        <span className="info-value">
+                          {selectedCliente.fechaRegistro ? 
+                            formatDate(selectedCliente.fechaRegistro) : 
+                            'Fecha desconocida'}
+                        </span>
+                      </div>
                       {selectedCliente.fechaActualizacion && (
-                        <p><strong>Última Actualización:</strong> {
-                          formatDate(selectedCliente.fechaActualizacion)
-                        }</p>
+                        <div className="info-item">
+                          <span className="info-label">Última Actualización:</span>
+                          <span className="info-value">
+                            {formatDate(selectedCliente.fechaActualizacion)}
+                          </span>
+                        </div>
                       )}
                     </div>
-                    
-                    <div className="actions-card">
-                      <h4>Acciones Rápidas</h4>
-                      <div className="quick-actions">
-                        <button 
-                          onClick={() => {
-                            loadClienteForEdit(selectedCliente.id);
-                            setShowPerfilModal(false);
-                          }} 
-                          className="btn-edit"
-                        >
-                          Editar Información
-                        </button>
-                        <button 
-                          onClick={() => {
-                            toggleAccountStatus(selectedCliente.id, selectedCliente.activo);
-                            setShowPerfilModal(false);
-                          }} 
-                          className={selectedCliente.activo ? 'btn-deactivate' : 'btn-activate'}
-                        >
-                          {selectedCliente.activo ? 'Desactivar Cuenta' : 'Activar Cuenta'}
-                        </button>
-                      </div>
+                  </div>
+                  
+                    <div className="actions-section">
+                    <h4>Acciones Rápidas</h4>
+                    <div className="action-buttons">
+                      <button 
+                        onClick={() => {
+                          openEditModal(selectedCliente.id);
+                          setShowPerfilModal(false);
+                        }} 
+                        className="btn-modal-action"
+                      >
+                        <i className="fa fa-pencil"></i> 
+                        Modificar Datos del Cliente
+                      </button>
+                      <button 
+                        onClick={() => {
+                          toggleAccountStatus(selectedCliente.id, selectedCliente.activo);
+                          setSelectedCliente(prev => ({...prev, activo: !prev.activo}));
+                        }} 
+                        className={selectedCliente.activo ? 'btn-modal-deactivate' : 'btn-modal-activate'}
+                      >
+                        <i className={selectedCliente.activo ? "fa fa-toggle-on" : "fa fa-toggle-off"}></i>
+                        {selectedCliente.activo ? 'Desactivar Cuenta de Cliente' : 'Activar Cuenta de Cliente'}
+                      </button>
                     </div>
                   </div>
-                )}
-                
-                {/* Tab de Historial de Viajes */}
-                {activeTab === 'viajes' && (
-                  <div className="viajes-tab">
-                    <h4>Historial de Viajes</h4>
-                    {historialViajes.length > 0 ? (
-                      <ul className="viajes-list">
-                        {historialViajes.map((viaje) => (
-                          <li key={viaje.id} className="viaje-item">
-                            <div className="viaje-info">
-                              <div className="viaje-fecha">{viaje.fecha}</div>
-                              <div className="viaje-ruta">
-                                <span className="origen">{viaje.origen || 'Origen no especificado'}</span>
-                                <span className="separator">➝</span>
-                                <span className="destino">{viaje.destino || 'Destino no especificado'}</span>
-                              </div>
-                              {viaje.calificacion && (
-                                <div className="viaje-calificacion">
-                                  {Array(5).fill().map((_, i) => (
-                                    <span key={i} className={i < viaje.calificacion ? "star filled" : "star"}>★</span>
-                                  ))}
-                                </div>
-                              )}
+                </div>
+              )}
+              
+              {/* Tab de Historial de Viajes */}
+              {activeTab === 'viajes' && (
+                <div className="viajes-tab">
+                  <h4>Historial de Viajes</h4>
+                  {historialViajes.length > 0 ? (
+                    <div className="viajes-list">
+                      {historialViajes.map((viaje) => (
+                        <div key={viaje.id} className="viaje-item">
+                          <div className="viaje-header">
+                            <div className="viaje-fecha">{viaje.fecha}</div>
+                            <div className="viaje-calificacion">
+                              {[...Array(5)].map((_, i) => (
+                                <span key={i} 
+                                  className={i < (viaje.calificacion || 0) ? "star-filled" : "star-empty"}>
+                                  ★
+                                </span>
+                              ))}
                             </div>
-                            {viaje.conductorNombre && (
-                              <div className="viaje-conductor">
-                                <strong>Conductor:</strong> {viaje.conductorNombre}
-                              </div>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="no-data">No hay viajes registrados para este cliente.</p>
-                    )}
-                  </div>
-                )}
-                
-                {/* Tab de Comentarios */}
-                {activeTab === 'comentarios' && (
-                  <div className="comentarios-tab">
-                    <h4>Comentarios sobre Conductores</h4>
-                    
-                    {/* Formulario para añadir comentario */}
-                    <div className="nuevo-comentario">
-                      <h5>Añadir Nuevo Comentario</h5>
-                      <form onSubmit={handleAddComentario}>
-                        <textarea
-                          value={nuevoComentario}
-                          onChange={(e) => setNuevoComentario(e.target.value)}
-                          placeholder="Escriba su comentario sobre un conductor..."
-                          required
-                        ></textarea>
-                        <button type="submit" className="btn-add-comment">
-                          Añadir Comentario
-                        </button>
-                      </form>
+                          </div>
+                          <div className="viaje-route">
+                            <span className="viaje-origen">{viaje.origen || 'Origen no especificado'}</span>
+                            <span> → </span>
+                            <span className="viaje-destino">{viaje.destino || 'Destino no especificado'}</span>
+                          </div>
+                          {viaje.conductorNombre && (
+                            <div className="viaje-conductor">
+                              <i className="fa fa-user-circle"></i>
+                              <span>{viaje.conductorNombre}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                    
-                    {/* Lista de comentarios */}
+                  ) : (
+                    <div className="no-data">
+                      <i className="fa fa-car"></i>
+                      <p>No hay viajes registrados para este cliente.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Tab de Comentarios */}
+              {activeTab === 'comentarios' && (
+                <div className="comentarios-tab">
+                  <div className="comentarios-form">
+                    <h4>Añadir Nuevo Comentario</h4>
+                    <form onSubmit={handleAddComentario}>
+                      <textarea
+                        value={nuevoComentario}
+                        onChange={(e) => setNuevoComentario(e.target.value)}
+                        placeholder="Escriba su comentario sobre este cliente..."
+                        required
+                      ></textarea>
+                      <button type="submit" className="btn-save">
+                        <i className="fa fa-plus-circle"></i> Añadir Comentario
+                      </button>
+                    </form>
+                  </div>
+                  
+                  <div className="comentarios-section">
+                    <h4>Comentarios Registrados</h4>
                     {comentariosConductores.length > 0 ? (
-                      <ul className="comentarios-list">
+                      <div className="comentarios-list">
                         {comentariosConductores.map((comentario) => (
-                          <li key={comentario.id} className="comentario-item">
+                          <div key={comentario.id} className="comentario-item">
                             <div className="comentario-header">
-                              <strong>{comentario.conductor || 'Conductor'}</strong>
-                              <span className="comentario-fecha">{comentario.fecha}</span>
+                              <div className="comentario-conductor">
+                                <i className="fa fa-user-circle"></i>
+                                <span>{comentario.conductor || 'Conductor no identificado'}</span>
+                              </div>
+                              <div className="comentario-fecha">{comentario.fecha}</div>
                             </div>
-                            <div className="comentario-mensaje">
+                            <div className="comentario-body">
                               {comentario.mensaje}
                             </div>
-                          </li>
+                          </div>
                         ))}
-                      </ul>
+                      </div>
                     ) : (
-                      <p className="no-data">No hay comentarios registrados para este cliente.</p>
+                      <div className="no-data">
+                        <i className="fa fa-comments"></i>
+                        <p>No hay comentarios registrados para este cliente.</p>
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -3,7 +3,6 @@ import {
   collection, 
   addDoc, 
   updateDoc, 
-  deleteDoc, 
   doc, 
   onSnapshot, 
   getDoc,
@@ -38,6 +37,7 @@ const GestionConductores = () => {
   const [currentConductorId, setCurrentConductorId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showDetails, setShowDetails] = useState({});
+  const [notificacion, setNotificacion] = useState({ visible: false, mensaje: '', tipo: '' });
 
   // Estados para el perfil de conductor
   const [selectedConductor, setSelectedConductor] = useState(null);
@@ -55,8 +55,26 @@ const GestionConductores = () => {
     { dia: 'Sábado', disponible: false },
     { dia: 'Domingo', disponible: false },
   ]);
+  
+  // Estados para modal de edición
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [conductorEdit, setConductorEdit] = useState(null);
 
   const storage = getStorage();
+  
+  // Sistema de notificaciones
+  const mostrarNotificacion = (mensaje, tipo = 'info') => {
+    setNotificacion({
+      visible: true,
+      mensaje,
+      tipo
+    });
+    
+    // Auto-ocultar después de 3 segundos
+    setTimeout(() => {
+      setNotificacion(prev => ({ ...prev, visible: false }));
+    }, 3000);
+  };
 
   // Obtener conductores de Firebase
   useEffect(() => {
@@ -72,8 +90,7 @@ const GestionConductores = () => {
     } catch (error) {
       console.error("Error al obtener conductores:", error);
       setLoading(false);
-      // Si hay un error en la conexión con Firebase, podemos mostrar datos de prueba
-      // para desarrollo o una alerta según el entorno
+      mostrarNotificacion('Error al cargar conductores', 'error');
     }
   }, []);
 
@@ -85,11 +102,30 @@ const GestionConductores = () => {
       [name]: type === 'checkbox' ? checked : value 
     });
   };
+  
+  // Manejador de cambios en el formulario de edición modal
+  const handleEditChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setConductorEdit(prev => ({ 
+      ...prev, 
+      [name]: type === 'checkbox' ? checked : value 
+    }));
+  };
 
   // Manejador para el archivo de licencia
   const handleFileChange = (e) => {
     if (e.target.files[0]) {
       setFile(e.target.files[0]);
+    }
+  };
+  
+  // Manejador para el archivo de licencia en modal de edición
+  const handleEditFileChange = (e) => {
+    if (e.target.files[0]) {
+      setConductorEdit(prev => ({
+        ...prev,
+        newFile: e.target.files[0]
+      }));
     }
   };
 
@@ -98,12 +134,12 @@ const GestionConductores = () => {
     e.preventDefault();
     
     if (!formData.nombre || !formData.email || !formData.telefono || !formData.licencia) {
-      alert('Los campos Nombre, Email, Teléfono y Licencia son obligatorios.');
+      mostrarNotificacion('Los campos Nombre, Email, Teléfono y Licencia son obligatorios', 'warning');
       return;
     }
 
     if (!editMode && !file) {
-      alert('La foto de la licencia es requerida para nuevos conductores.');
+      mostrarNotificacion('La foto de la licencia es requerida para nuevos conductores', 'warning');
       return;
     }
 
@@ -114,7 +150,7 @@ const GestionConductores = () => {
       
       // Si hay un nuevo archivo, subir a Storage
       if (file) {
-        const storageRef = ref(storage, `licencias/${file.name}`);
+        const storageRef = ref(storage, `licencias/${Date.now()}_${file.name}`);
         await uploadBytes(storageRef, file);
         licenciaURL = await getDownloadURL(storageRef);
       }
@@ -126,14 +162,14 @@ const GestionConductores = () => {
           licenciaURL,
           fechaActualizacion: new Date().toISOString()
         });
-        alert('Conductor actualizado correctamente.');
+        mostrarNotificacion('Conductor actualizado correctamente', 'success');
       } else {
         // Verificar si el email ya existe
         const emailQuery = query(collection(db, 'conductores'), where('email', '==', formData.email));
         const emailSnapshot = await getDocs(emailQuery);
         
         if (!emailSnapshot.empty) {
-          alert('Ya existe un conductor con este correo electrónico.');
+          mostrarNotificacion('Ya existe un conductor con este correo electrónico', 'warning');
           setLoading(false);
           return;
         }
@@ -145,14 +181,14 @@ const GestionConductores = () => {
           fechaRegistro: new Date().toISOString()
         });
         
-        alert('Conductor agregado correctamente.');
+        mostrarNotificacion('Conductor agregado correctamente', 'success');
       }
       
       // Resetear el formulario
       resetForm();
     } catch (error) {
       console.error('Error al procesar conductor:', error);
-      alert(`Error: ${error.message}`);
+      mostrarNotificacion(`Error: ${error.message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -172,9 +208,6 @@ const GestionConductores = () => {
     setFile(null);
     setEditMode(false);
     setCurrentConductorId(null);
-    
-    // Desplazamiento al inicio del formulario para mejor experiencia de usuario
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Cambiar estado de activación del conductor
@@ -194,93 +227,81 @@ const GestionConductores = () => {
         });
       }
       
-      alert(`Conductor ${!currentStatus ? 'activado' : 'desactivado'} correctamente.`);
+      const mensaje = !currentStatus ? 'Conductor activado correctamente' : 'Conductor desactivado correctamente';
+      mostrarNotificacion(mensaje, 'success');
     } catch (error) {
       console.error('Error al actualizar estado:', error);
-      alert('Error al actualizar estado del conductor.');
+      mostrarNotificacion('Error al actualizar estado del conductor', 'error');
     }
   };
 
-  // Eliminar conductor
-  const deleteConductor = async (conductorId) => {
-    if (window.confirm('¿Está seguro que desea eliminar este conductor? Esta acción no se puede deshacer.')) {
-      try {
-        // Verificar si tiene viajes asociados (en caso de que exista esa relación)
-        try {
-          const viajesQuery = query(collection(db, 'viajes'), where('conductorId', '==', conductorId));
-          const viajesSnapshot = await getDocs(viajesQuery);
-          
-          if (!viajesSnapshot.empty) {
-            if (!window.confirm('Este conductor tiene viajes asociados. ¿Desea eliminarlo de todas formas?')) {
-              return false;
-            }
-            
-            // Eliminar todos los viajes asociados
-            for (const docItem of viajesSnapshot.docs) {
-              await deleteDoc(docItem.ref);
-            }
-          }
-        } catch (error) {
-          console.error("Error al verificar viajes:", error);
-          // Continuar con la eliminación del conductor
-        }
-        
-        // Eliminar comentarios asociados (si existen)
-        try {
-          const comentariosQuery = query(collection(db, 'comentarios'), where('conductorId', '==', conductorId));
-          const comentariosSnapshot = await getDocs(comentariosQuery);
-          
-          for (const docItem of comentariosSnapshot.docs) {
-            await deleteDoc(docItem.ref);
-          }
-        } catch (error) {
-          console.error("Error al eliminar comentarios:", error);
-          // Continuar con la eliminación del conductor
-        }
-        
-        // Finalmente eliminar el conductor
-        await deleteDoc(doc(db, 'conductores', conductorId));
-        
-        // Si estábamos viendo el perfil del conductor eliminado, cerrar el modal
-        if (selectedConductor && selectedConductor.id === conductorId) {
-          setShowPerfilModal(false);
-          setSelectedConductor(null);
-        }
-        
-        alert('Conductor eliminado correctamente.');
-        return true;
-      } catch (error) {
-        console.error('Error al eliminar conductor:', error);
-        alert('Error al eliminar conductor.');
-        return false;
-      }
-    }
-    return false;
-  };
-
-  // Cargar conductor para editar
-  const loadConductorForEdit = async (conductorId) => {
+  // Abrir modal de edición
+  const openEditModal = async (conductorId) => {
     try {
       const conductorDoc = await getDoc(doc(db, 'conductores', conductorId));
       
       if (conductorDoc.exists()) {
-        setFormData(conductorDoc.data());
-        setEditMode(true);
-        setCurrentConductorId(conductorId);
+        setConductorEdit({
+          id: conductorId,
+          ...conductorDoc.data(),
+          newFile: null
+        });
+        setShowEditModal(true);
         
         // Si el modal del perfil estaba abierto, lo cerramos
         if (showPerfilModal) {
           setShowPerfilModal(false);
         }
-        
-        // Nos aseguramos de que el usuario vea el formulario (scroll hacia arriba)
-        window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
-        alert('El conductor no existe.');
+        mostrarNotificacion('El conductor no existe', 'error');
       }
     } catch (error) {
       console.error('Error al cargar conductor:', error);
-      alert('Error al cargar datos del conductor.');
+      mostrarNotificacion('Error al cargar datos del conductor', 'error');
+    }
+  };
+  
+  // Guardar edición del conductor
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    
+    if (!conductorEdit.nombre || !conductorEdit.email || !conductorEdit.telefono || !conductorEdit.licencia) {
+      mostrarNotificacion('Los campos Nombre, Email, Teléfono y Licencia son obligatorios', 'warning');
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      let licenciaURL = conductorEdit.licenciaURL || '';
+      
+      // Si hay un nuevo archivo, subir a Storage
+      if (conductorEdit.newFile) {
+        const storageRef = ref(storage, `licencias/${Date.now()}_${conductorEdit.newFile.name}`);
+        await uploadBytes(storageRef, conductorEdit.newFile);
+        licenciaURL = await getDownloadURL(storageRef);
+      }
+
+      // Actualizar conductor en Firebase
+      await updateDoc(doc(db, 'conductores', conductorEdit.id), {
+        nombre: conductorEdit.nombre,
+        email: conductorEdit.email,
+        telefono: conductorEdit.telefono,
+        licencia: conductorEdit.licencia,
+        licenciaURL,
+        activo: conductorEdit.activo,
+        fechaActualizacion: new Date().toISOString()
+      });
+      
+      // Cerrar modal y mostrar notificación
+      setShowEditModal(false);
+      setConductorEdit(null);
+      mostrarNotificacion('Conductor actualizado correctamente', 'success');
+    } catch (error) {
+      console.error('Error al actualizar conductor:', error);
+      mostrarNotificacion(`Error: ${error.message}`, 'error');
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -301,7 +322,7 @@ const GestionConductores = () => {
       const conductorDoc = await getDoc(doc(db, 'conductores', conductorId));
       
       if (!conductorDoc.exists()) {
-        alert('El conductor no existe en la base de datos.');
+        mostrarNotificacion('El conductor no existe en la base de datos', 'error');
         setLoading(false);
         return;
       }
@@ -333,10 +354,7 @@ const GestionConductores = () => {
         setHistorialViajes(viajesData);
       } catch (error) {
         console.error('Error al cargar viajes:', error);
-        // Usar datos de demostración solo si realmente no hay viajes
-        if (historialViajes.length === 0) {
-          setHistorialViajes([]);
-        }
+        setHistorialViajes([]);
       }
       
       // Cargar comentarios de clientes
@@ -357,10 +375,7 @@ const GestionConductores = () => {
         setComentariosClientes(comentariosData);
       } catch (error) {
         console.error('Error al cargar comentarios:', error);
-        // Usar datos de demostración solo si realmente no hay comentarios
-        if (comentariosClientes.length === 0) {
-          setComentariosClientes([]);
-        }
+        setComentariosClientes([]);
       }
       
       // Mostrar modal
@@ -368,7 +383,7 @@ const GestionConductores = () => {
       setLoading(false);
     } catch (error) {
       console.error('Error al cargar perfil:', error);
-      alert('Error al cargar perfil del conductor.');
+      mostrarNotificacion('Error al cargar perfil del conductor', 'error');
       setLoading(false);
     }
   };
@@ -433,573 +448,674 @@ const GestionConductores = () => {
         fechaActualizacion: new Date().toISOString()
       });
       
-      alert('Cambios de disponibilidad guardados correctamente');
+      mostrarNotificacion('Cambios de disponibilidad guardados correctamente', 'success');
     } catch (error) {
       console.error('Error al guardar horarios:', error);
-      alert('Error al guardar horarios.');
-    }
-  };
-
-  // Eliminar comentario
-  const deleteComentario = async (comentarioId) => {
-    if (window.confirm('¿Está seguro de eliminar este comentario?')) {
-      try {
-        // Eliminar de Firebase si existe
-        try {
-          await deleteDoc(doc(db, 'comentarios', comentarioId));
-        } catch (error) {
-          console.error('Error al eliminar comentario de Firebase:', error);
-        }
-        
-        // Actualizar la UI
-        setComentariosClientes(
-          comentariosClientes.filter(c => c.id !== comentarioId)
-        );
-        
-        alert('Comentario eliminado');
-      } catch (error) {
-        console.error('Error al eliminar comentario:', error);
-        alert('Error al eliminar el comentario.');
-      }
+      mostrarNotificacion('Error al guardar horarios', 'error');
     }
   };
 
   return (
-    <div className="gestion-conductores">
-      <h2>{editMode ? 'Editar Conductor' : 'Agregar Nuevo Conductor'}</h2>
-      
-      <form onSubmit={handleSubmit} className="gestion-form">
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="nombre">Nombre Completo</label>
-            <input 
-              type="text" 
-              id="nombre"
-              name="nombre" 
-              placeholder="Nombre Completo" 
-              value={formData.nombre} 
-              onChange={handleInputChange} 
-              required 
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="email">Correo Electrónico</label>
-            <input 
-              type="email" 
-              id="email"
-              name="email" 
-              placeholder="Correo Electrónico" 
-              value={formData.email} 
-              onChange={handleInputChange} 
-              required 
-            />
-          </div>
-        </div>
-        
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="telefono">Teléfono</label>
-            <input 
-              type="tel" 
-              id="telefono"
-              name="telefono" 
-              placeholder="Teléfono" 
-              value={formData.telefono} 
-              onChange={handleInputChange} 
-              required 
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="licencia">Número de Licencia</label>
-            <input 
-              type="text" 
-              id="licencia"
-              name="licencia" 
-              placeholder="Número de Licencia" 
-              value={formData.licencia} 
-              onChange={handleInputChange} 
-              required 
-            />
-          </div>
-        </div>
-        
-        <div className="form-row">
-          <div className="form-group file-upload">
-            <label htmlFor="file">Foto de Licencia</label>
-            <input 
-              type="file" 
-              id="file" 
-              accept="image/*" 
-              onChange={handleFileChange} 
-              required={!editMode && !formData.licenciaURL} 
-            />
-            {editMode && formData.licenciaURL && (
-              <p className="file-notice">Ya hay una imagen cargada. Seleccione otra solo si desea cambiarla.</p>
-            )}
-          </div>
-          
-          <div className="form-group checkbox-container">
-            <label>
-              <input 
-                type="checkbox" 
-                name="activo" 
-                checked={formData.activo} 
-                onChange={handleInputChange} 
-              />
-              Conductor Activo
-            </label>
-          </div>
-        </div>
-        
-        <div className="form-buttons">
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Procesando...' : (editMode ? 'Actualizar Conductor' : 'Agregar Conductor')}
-          </button>
-          
-          {editMode && (
-            <button type="button" onClick={resetForm} className="btn-cancel">
-              Cancelar
-            </button>
-          )}
-        </div>
-      </form>
-      
-      <div className="search-container">
-        <h3>Conductores Registrados</h3>
-        <input
-          type="text"
-          placeholder="Buscar por nombre, email, teléfono o licencia"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="search-input"
-        />
+    <div className="gestion-conductores-container">
+      {/* Encabezado de sección */}
+      <div className="section-header">
+        <h2>Panel de Gestión de Conductores</h2>
+        <div className="green-underline"></div>
       </div>
       
-      {loading && <p className="loading-message">Cargando conductores...</p>}
+      {/* Sección de formulario */}
+      <div className="conductor-section">
+        <h3>Agregar Nuevo Conductor</h3>
+        
+        <form onSubmit={handleSubmit} className="conductor-form">
+          <div className="form-grid">
+            <div className="form-group">
+              <label htmlFor="nombre">Nombre Completo</label>
+              <input 
+                type="text" 
+                id="nombre"
+                name="nombre" 
+                value={formData.nombre} 
+                onChange={handleInputChange} 
+                required 
+              />
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="email">Correo Electrónico</label>
+              <input 
+                type="email" 
+                id="email"
+                name="email" 
+                value={formData.email} 
+                onChange={handleInputChange} 
+                required 
+              />
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="telefono">Teléfono</label>
+              <input 
+                type="tel" 
+                id="telefono"
+                name="telefono" 
+                value={formData.telefono} 
+                onChange={handleInputChange} 
+                required 
+              />
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="licencia">Número de Licencia</label>
+              <input 
+                type="text" 
+                id="licencia"
+                name="licencia" 
+                value={formData.licencia} 
+                onChange={handleInputChange} 
+                required 
+              />
+            </div>
+          </div>
+          
+          <div className="form-file-group">
+            <label htmlFor="file">Foto de Licencia</label>
+            <div className="file-input-container">
+              <input 
+                type="file" 
+                id="file" 
+                accept="image/*" 
+                onChange={handleFileChange} 
+                required={!editMode && !formData.licenciaURL} 
+                className="file-input"
+              />
+              <div className="file-input-label">
+                <i className="fa fa-upload"></i>
+                <span>{file ? file.name : 'Seleccionar archivo'}</span>
+              </div>
+            </div>
+            <div className="form-checkbox">
+              <label>
+                <input 
+                  type="checkbox" 
+                  name="activo" 
+                  checked={formData.activo} 
+                  onChange={handleInputChange} 
+                />
+                Conductor Activo
+              </label>
+            </div>
+          </div>
+          
+          <div className="form-actions">
+            <button type="submit" className="btn-primary" disabled={loading}>
+              {loading ? 'Procesando...' : 'Registrar Conductor'}
+            </button>
+          </div>
+        </form>
+      </div>
       
-      {!loading && filteredConductores.length === 0 && (
-        <p className="no-results">No hay conductores que coincidan con la búsqueda.</p>
-      )}
-      
-      {!loading && filteredConductores.length > 0 && (
-        <>
-          {/* Vista de escritorio: Tabla */}
-          <div className="tabla-container desktop-view">
-            <table className="tabla-conductores">
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Email</th>
-                  <th>Teléfono</th>
-                  <th>Licencia</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredConductores.map(conductor => (
-                  <React.Fragment key={conductor.id}>
-                    <tr className={conductor.activo ? 'conductor-activo' : 'conductor-inactivo'}>
-                      <td>{conductor.nombre}</td>
-                      <td>{conductor.email}</td>
-                      <td>{conductor.telefono}</td>
-                      <td>{conductor.licencia}</td>
-                      <td>
-                        <span className={`status-badge ${conductor.activo ? 'active' : 'inactive'}`}>
-                          {conductor.activo ? 'Activo' : 'Inactivo'}
-                        </span>
-                      </td>
-                      <td className="actions-cell">
-                        <button 
-                          onClick={() => toggleDetails(conductor.id)} 
-                          className="btn-details"
-                          aria-label="Ver detalles"
-                          title="Ver detalles"
-                        >
-                          <i className="fa fa-info-circle"></i>
-                        </button>
-                        <button 
-                          onClick={() => loadConductorForEdit(conductor.id)} 
-                          className="btn-edit"
-                          aria-label="Editar conductor"
-                          title="Editar conductor"
-                        >
-                          <i className="fa fa-pencil"></i>
-                        </button>
-                        <button 
-                          onClick={() => toggleAccountStatus(conductor.id, conductor.activo)} 
-                          className={conductor.activo ? 'btn-deactivate' : 'btn-activate'}
-                          aria-label={conductor.activo ? 'Desactivar conductor' : 'Activar conductor'}
-                          title={conductor.activo ? 'Desactivar conductor' : 'Activar conductor'}
-                        >
-                          <i className={conductor.activo ? "fa fa-toggle-on" : "fa fa-toggle-off"}></i>
-                        </button>
-                        <button 
-                          onClick={() => deleteConductor(conductor.id)} 
-                          className="btn-delete"
-                          aria-label="Eliminar conductor"
-                          title="Eliminar conductor"
-                        >
-                          <i className="fa fa-trash"></i>
-                        </button>
-                        <button 
-                          onClick={() => verPerfil(conductor.id)} 
-                          className="btn-perfil"
-                          aria-label="Ver perfil completo"
-                          title="Ver perfil completo"
-                        >
-                          <i className="fa fa-user"></i>
-                        </button>
-                      </td>
-                    </tr>
-                    
-                    {/* Fila expandible con detalles */}
-                    {showDetails[conductor.id] && (
-                      <tr className="details-row">
-                        <td colSpan="6">
-                          <div className="conductor-details">
-                            {conductor.licenciaURL && (
-                              <div className="license-img-container">
-                                <img 
-                                  src={conductor.licenciaURL} 
-                                  alt="Licencia de conducir" 
-                                  className="license-img" 
-                                />
-                              </div>
-                            )}
-                            <div className="conductor-details-text">
-                              <p><strong>Fecha de Registro:</strong> {
-                                conductor.fechaRegistro ? 
-                                  formatDate(conductor.fechaRegistro) : 
-                                  'Fecha desconocida'
-                              }</p>
-                              {conductor.fechaActualizacion && (
-                                <p><strong>Última Actualización:</strong> {
-                                  formatDate(conductor.fechaActualizacion)
-                                }</p>
-                              )}
-                            </div>
+      {/* Sección de lista de conductores */}
+      <div className="conductor-section">
+        <h3>Conductores Registrados en el Sistema</h3>
+        
+        <div className="search-bar">
+          <input
+            type="text"
+            placeholder="Buscar por nombre, email, teléfono o licencia"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-input"
+          />
+        </div>
+        
+        {loading && (
+          <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p className="loading-message">Cargando conductores...</p>
+          </div>
+        )}
+        
+        {!loading && filteredConductores.length === 0 && (
+          <div className="no-results">
+            <i className="fa fa-exclamation-circle"></i>
+            <p>No hay conductores que coincidan con la búsqueda.</p>
+          </div>
+        )}
+        
+        {!loading && filteredConductores.length > 0 && (
+          <>
+            {/* Vista de escritorio: Tabla */}
+            <div className="table-container desktop-view">
+              <table className="conductores-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Email</th>
+                    <th>Teléfono</th>
+                    <th>Licencia</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredConductores.map(conductor => (
+                    <React.Fragment key={conductor.id}>
+                      <tr className={conductor.activo ? 'row-active' : 'row-inactive'}>
+                        <td data-label="Nombre">{conductor.nombre}</td>
+                        <td data-label="Email">{conductor.email}</td>
+                        <td data-label="Teléfono">{conductor.telefono}</td>
+                        <td data-label="Licencia">{conductor.licencia}</td>
+                        <td data-label="Estado">
+                          <span className={`status-badge ${conductor.activo ? 'active' : 'inactive'}`}>
+                            {conductor.activo ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </td>
+                        <td data-label="Acciones">
+                          <div className="action-buttons">
+                            <button 
+                              onClick={() => toggleDetails(conductor.id)} 
+                              className="btn-table-action btn-details"
+                            >
+                              <i className="fa fa-info-circle"></i>
+                              <span>Detalles</span>
+                            </button>
+                            <button 
+                              onClick={() => openEditModal(conductor.id)} 
+                              className="btn-table-action btn-edit"
+                            >
+                              <i className="fa fa-pencil"></i>
+                              <span>Editar</span>
+                            </button>
+                            <button 
+                              onClick={() => toggleAccountStatus(conductor.id, conductor.activo)} 
+                              className={`btn-table-action ${conductor.activo ? 'btn-deactivate' : 'btn-activate'}`}
+                            >
+                              <i className={conductor.activo ? "fa fa-toggle-on" : "fa fa-toggle-off"}></i>
+                              <span>{conductor.activo ? 'Desactivar' : 'Activar'}</span>
+                            </button>
+                            <button 
+                              onClick={() => verPerfil(conductor.id)} 
+                              className="btn-table-action btn-profile"
+                            >
+                              <i className="fa fa-user"></i>
+                              <span>Perfil</span>
+                            </button>
                           </div>
                         </td>
                       </tr>
+                      
+                      {/* Fila expandible con detalles */}
+                      {showDetails[conductor.id] && (
+                        <tr className="details-row">
+                          <td colSpan="6">
+                            <div className="conductor-details">
+                              {conductor.licenciaURL && (
+                                <div className="license-img-container">
+                                  <img 
+                                    src={conductor.licenciaURL} 
+                                    alt="Licencia de conducir" 
+                                    className="license-img" 
+                                  />
+                                </div>
+                              )}
+                              <div className="conductor-details-text">
+                                <p><strong>Fecha de Registro:</strong> {
+                                  conductor.fechaRegistro ? 
+                                    formatDate(conductor.fechaRegistro) : 
+                                    'Fecha desconocida'
+                                }</p>
+                                {conductor.fechaActualizacion && (
+                                  <p><strong>Última Actualización:</strong> {
+                                    formatDate(conductor.fechaActualizacion)
+                                  }</p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Vista móvil: Tarjetas */}
+            <div className="mobile-view">
+              {filteredConductores.map(conductor => (
+                <div 
+                  key={conductor.id} 
+                  className={`conductor-card ${conductor.activo ? 'card-active' : 'card-inactive'}`}
+                >
+                  <div className="card-header">
+                    <h4>{conductor.nombre}</h4>
+                    <span className={`status-badge ${conductor.activo ? 'active' : 'inactive'}`}>
+                      {conductor.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </div>
+                  
+                  <div className="card-body">
+                    <p><i className="fa fa-envelope"></i> {conductor.email}</p>
+                    <p><i className="fa fa-phone"></i> {conductor.telefono}</p>
+                    <p><i className="fa fa-id-card"></i> {conductor.licencia}</p>
+                    
+                    {showDetails[conductor.id] && (
+                      <div className="card-expanded">
+                        {conductor.licenciaURL && (
+                          <div className="license-img-container">
+                            <img 
+                              src={conductor.licenciaURL} 
+                              alt="Licencia de conducir" 
+                              className="license-img" 
+                            />
+                          </div>
+                        )}
+                        <p><i className="fa fa-calendar"></i> Registro: {
+                          conductor.fechaRegistro ? 
+                            formatDate(conductor.fechaRegistro) : 
+                            'Fecha desconocida'
+                        }</p>
+                        {conductor.fechaActualizacion && (
+                          <p><i className="fa fa-refresh"></i> Actualización: {
+                            formatDate(conductor.fechaActualizacion)
+                          }</p>
+                        )}
+                      </div>
                     )}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          
-          {/* Vista móvil: Tarjetas */}
-          <div className="mobile-view">
-            {filteredConductores.map(conductor => (
-              <div 
-                key={conductor.id} 
-                className={`conductor-card ${conductor.activo ? 'card-activo' : 'card-inactivo'}`}
+                  </div>
+                  
+                  <div className="card-actions">
+                    <button 
+                      onClick={() => toggleDetails(conductor.id)} 
+                      className="btn-card-action"
+                    >
+                      {showDetails[conductor.id] ? 'Ocultar detalles' : 'Ver detalles'}
+                    </button>
+                    
+                    <div className="card-buttons">
+                      <button 
+                        onClick={() => openEditModal(conductor.id)} 
+                        className="btn-card-action btn-edit"
+                      >
+                        <i className="fa fa-pencil"></i>
+                        Editar Conductor
+                      </button>
+                      <button 
+                        onClick={() => toggleAccountStatus(conductor.id, conductor.activo)} 
+                        className={`btn-card-action ${conductor.activo ? 'btn-deactivate' : 'btn-activate'}`}
+                      >
+                        <i className={conductor.activo ? "fa fa-toggle-on" : "fa fa-toggle-off"}></i>
+                        {conductor.activo ? 'Desactivar Conductor' : 'Activar Conductor'}
+                      </button>
+                      <button 
+                        onClick={() => verPerfil(conductor.id)} 
+                        className="btn-card-action btn-profile"
+                      >
+                        <i className="fa fa-user"></i>
+                        Ver Perfil Completo
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+      
+      {/* Modal de edición de conductor */}
+      {showEditModal && conductorEdit && (
+        <div className="modal-overlay">
+          <div className="modal-container">
+            <div className="modal-header">
+              <h3>Editar Conductor</h3>
+              <button 
+                className="close-button" 
+                onClick={() => setShowEditModal(false)}
               >
-                <div className="card-header">
-                  <h4>{conductor.nombre}</h4>
-                  <span className={`status-badge ${conductor.activo ? 'active' : 'inactive'}`}>
-                    {conductor.activo ? 'Activo' : 'Inactivo'}
-                  </span>
+                &times;
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              <form onSubmit={handleSaveEdit}>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label htmlFor="edit-nombre">Nombre Completo</label>
+                    <input 
+                      type="text" 
+                      id="edit-nombre"
+                      name="nombre" 
+                      value={conductorEdit.telefono || ''} 
+                      onChange={handleEditChange} 
+                      required 
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="edit-licencia">Número de Licencia</label>
+                    <input 
+                      type="text" 
+                      id="edit-licencia"
+                      name="licencia" 
+                      value={conductorEdit.licencia || ''} 
+                      onChange={handleEditChange} 
+                      required 
+                    />
+                  </div>
                 </div>
                 
-                <div className="card-body">
-                  <p><i className="fa fa-envelope"></i> {conductor.email}</p>
-                  <p><i className="fa fa-phone"></i> {conductor.telefono}</p>
-                  <p><i className="fa fa-id-card"></i> {conductor.licencia}</p>
-                  
-                  {showDetails[conductor.id] && (
-                    <div className="card-details">
-                      {conductor.licenciaURL && (
-                        <div className="license-img-container">
-                          <img 
-                            src={conductor.licenciaURL} 
-                            alt="Licencia de conducir" 
-                            className="license-img" 
-                          />
-                        </div>
-                      )}
-                      <p><i className="fa fa-calendar"></i> Registro: {
-                        conductor.fechaRegistro ? 
-                          formatDate(conductor.fechaRegistro) : 
-                          'Fecha desconocida'
-                      }</p>
-                      {conductor.fechaActualizacion && (
-                        <p><i className="fa fa-refresh"></i> Actualización: {
-                          formatDate(conductor.fechaActualizacion)
-                        }</p>
-                      )}
+                <div className="form-file-group">
+                  <label htmlFor="edit-file">Foto de Licencia</label>
+                  <div className="file-input-container">
+                    <input 
+                      type="file" 
+                      id="edit-file" 
+                      accept="image/*" 
+                      onChange={handleEditFileChange}
+                      className="file-input"
+                    />
+                    <div className="file-input-label">
+                      <i className="fa fa-upload"></i>
+                      <span>{conductorEdit.newFile ? conductorEdit.newFile.name : 'Seleccionar nuevo archivo'}</span>
+                    </div>
+                  </div>
+                  {conductorEdit.licenciaURL && (
+                    <div className="current-image-container">
+                      <p className="current-image-label">Imagen actual:</p>
+                      <img 
+                        src={conductorEdit.licenciaURL} 
+                        alt="Licencia actual" 
+                        className="current-image-preview" 
+                      />
                     </div>
                   )}
+                  <div className="form-checkbox">
+                    <label>
+                      <input 
+                        type="checkbox" 
+                        name="activo" 
+                        checked={conductorEdit.activo || false} 
+                        onChange={handleEditChange} 
+                      />
+                      Conductor Activo
+                    </label>
+                  </div>
                 </div>
                 
-                <div className="card-actions">
-                  <button 
-                    onClick={() => toggleDetails(conductor.id)} 
-                    className="btn-details"
-                  >
-                    {showDetails[conductor.id] ? 'Ocultar' : 'Detalles'}
+                <div className="modal-footer">
+                  <button type="button" onClick={() => setShowEditModal(false)} className="btn-cancel">
+                    Cancelar
                   </button>
-                  <button 
-                    onClick={() => loadConductorForEdit(conductor.id)} 
-                    className="btn-edit"
-                  >
-                    Editar
-                  </button>
-                  <button 
-                    onClick={() => toggleAccountStatus(conductor.id, conductor.activo)} 
-                    className={conductor.activo ? 'btn-deactivate' : 'btn-activate'}
-                  >
-                    {conductor.activo ? 'Desactivar' : 'Activar'}
-                  </button>
-                  <button 
-                    onClick={() => deleteConductor(conductor.id)} 
-                    className="btn-delete"
-                  >
-                    Eliminar
-                  </button>
-                  <button 
-                    onClick={() => verPerfil(conductor.id)} 
-                    className="btn-perfil"
-                  >
-                    Ver Perfil
+                  <button type="submit" className="btn-save" disabled={loading}>
+                    {loading ? 'Guardando...' : 'Guardar Cambios'}
                   </button>
                 </div>
-              </div>
-            ))}
+              </form>
+            </div>
           </div>
-        </>
+        </div>
       )}
       
       {/* Modal para Perfil de Conductor */}
       {showPerfilModal && selectedConductor && (
-        <div className="perfil-modal">
-          <div className="perfil-modal-content">
-            <div className="perfil-modal-header">
+        <div className="profile-modal">
+          <div className="modal-content">
+            <div className="modal-header">
               <h3>Perfil del Conductor</h3>
               <button 
-                className="close-btn" 
+                className="close-button" 
                 onClick={closePerfilModal}
               >
                 &times;
               </button>
             </div>
             
-            <div className="perfil-modal-body">
-              {/* Tabs de navegación */}
-              <div className="perfil-tabs">
-                <button 
-                  className={`tab-btn ${activeTab === 'info' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('info')}
-                >
-                  Información
-                </button>
-                <button 
-                  className={`tab-btn ${activeTab === 'horarios' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('horarios')}
-                >
-                  Disponibilidad
-                </button>
-                <button 
-                  className={`tab-btn ${activeTab === 'viajes' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('viajes')}
-                >
-                  Historial de Viajes
-                </button>
-                <button 
-                  className={`tab-btn ${activeTab === 'comentarios' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('comentarios')}
-                >
-                  Comentarios
-                </button>
-              </div>
-              
-              {/* Contenido de las tabs */}
-              <div className="tab-content">
-                {/* Tab de información */}
-                {activeTab === 'info' && (
-                  <div className="info-tab">
-                    <div className="info-card profile-header">
-                      {selectedConductor.licenciaURL && (
+            <div className="modal-tabs">
+              <button 
+                className={`tab-button ${activeTab === 'info' ? 'active' : ''}`}
+                onClick={() => setActiveTab('info')}
+              >
+                Información
+              </button>
+              <button 
+                className={`tab-button ${activeTab === 'horarios' ? 'active' : ''}`}
+                onClick={() => setActiveTab('horarios')}
+              >
+                Disponibilidad
+              </button>
+              <button 
+                className={`tab-button ${activeTab === 'viajes' ? 'active' : ''}`}
+                onClick={() => setActiveTab('viajes')}
+              >
+                Historial de Viajes
+              </button>
+              <button 
+                className={`tab-button ${activeTab === 'comentarios' ? 'active' : ''}`}
+                onClick={() => setActiveTab('comentarios')}
+              >
+                Comentarios
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              {/* Tab de Información */}
+              {activeTab === 'info' && (
+                <div className="info-tab">
+                  <div className="info-section profile-section">
+                    {selectedConductor.licenciaURL && (
+                      <div className="profile-image">
                         <img 
                           src={selectedConductor.licenciaURL} 
                           alt="Licencia de conducir" 
-                          className="profile-img"
+                          className="license-image" 
                         />
-                      )}
-                      <div className="profile-data">
-                        <h4>Datos Personales</h4>
-                        <p><strong>Nombre:</strong> {selectedConductor.nombre}</p>
-                        <p><strong>Email:</strong> {selectedConductor.email}</p>
-                        <p><strong>Teléfono:</strong> {selectedConductor.telefono}</p>
-                        <p><strong>Licencia:</strong> {selectedConductor.licencia}</p>
-                        <p><strong>Estado:</strong> <span className={selectedConductor.activo ? "status-active" : "status-inactive"}>
-                          {selectedConductor.activo ? 'Activo' : 'Inactivo'}
-                        </span></p>
-                        <p><strong>Fecha de Registro:</strong> {
-                          selectedConductor.fechaRegistro ? 
-                            formatDate(selectedConductor.fechaRegistro) : 
-                            'Fecha desconocida'
-                        }</p>
+                      </div>
+                    )}
+                    <div className="profile-info">
+                      <h4>Datos Personales</h4>
+                      <div className="info-grid">
+                        <div className="info-item">
+                          <span className="info-label">Nombre:</span>
+                          <span className="info-value">{selectedConductor.nombre}</span>
+                        </div>
+                        <div className="info-item">
+                          <span className="info-label">Email:</span>
+                          <span className="info-value">{selectedConductor.email}</span>
+                        </div>
+                        <div className="info-item">
+                          <span className="info-label">Teléfono:</span>
+                          <span className="info-value">{selectedConductor.telefono}</span>
+                        </div>
+                        <div className="info-item">
+                          <span className="info-label">Licencia:</span>
+                          <span className="info-value">{selectedConductor.licencia}</span>
+                        </div>
+                        <div className="info-item">
+                          <span className="info-label">Estado:</span>
+                          <span className="info-value">
+                            <span className={`status-badge ${selectedConductor.activo ? 'active' : 'inactive'}`}>
+                              {selectedConductor.activo ? 'Activo' : 'Inactivo'}
+                            </span>
+                          </span>
+                        </div>
+                        <div className="info-item">
+                          <span className="info-label">Fecha de Registro:</span>
+                          <span className="info-value">
+                            {selectedConductor.fechaRegistro ? 
+                              formatDate(selectedConductor.fechaRegistro) : 
+                              'Fecha desconocida'}
+                          </span>
+                        </div>
                         {selectedConductor.fechaActualizacion && (
-                          <p><strong>Última Actualización:</strong> {
-                            formatDate(selectedConductor.fechaActualizacion)
-                          }</p>
+                          <div className="info-item">
+                            <span className="info-label">Última Actualización:</span>
+                            <span className="info-value">
+                              {formatDate(selectedConductor.fechaActualizacion)}
+                            </span>
+                          </div>
                         )}
                       </div>
                     </div>
-                    
-                    <div className="actions-card">
-                      <h4>Acciones Rápidas</h4>
-                      <div className="action-buttons">
-                        <button 
-                          onClick={() => {
-                            loadConductorForEdit(selectedConductor.id);
-                            closePerfilModal();
-                          }} 
-                          className="btn-edit"
-                        >
-                          Editar Información
-                        </button>
-                        <button 
-                          onClick={() => {
-                            toggleAccountStatus(selectedConductor.id, selectedConductor.activo);
-                          }} 
-                          className={selectedConductor.activo ? 'btn-deactivate' : 'btn-activate'}
-                        >
-                          {selectedConductor.activo ? 'Desactivar Cuenta' : 'Activar Cuenta'}
-                        </button>
-                        <button 
-                          onClick={() => {
-                            if (deleteConductor(selectedConductor.id)) {
-                              closePerfilModal();
-                            }
-                          }} 
-                          className="btn-delete"
-                        >
-                          Eliminar Conductor
-                        </button>
-                      </div>
+                  </div>
+                  
+                  <div className="actions-section">
+                    <h4>Acciones Rápidas</h4>
+                    <div className="action-buttons">
+                      <button 
+                        onClick={() => {
+                          openEditModal(selectedConductor.id);
+                        }} 
+                        className="btn-modal-action"
+                      >
+                        <i className="fa fa-pencil"></i> 
+                        Modificar Datos del Conductor
+                      </button>
+                      <button 
+                        onClick={() => {
+                          toggleAccountStatus(selectedConductor.id, selectedConductor.activo);
+                        }} 
+                        className={selectedConductor.activo ? 'btn-modal-deactivate' : 'btn-modal-activate'}
+                      >
+                        <i className={selectedConductor.activo ? "fa fa-toggle-on" : "fa fa-toggle-off"}></i>
+                        {selectedConductor.activo ? 'Desactivar Cuenta de Conductor' : 'Activar Cuenta de Conductor'}
+                      </button>
                     </div>
                   </div>
-                )}
-                
-                {/* Tab de Horarios Disponibles */}
-                {activeTab === 'horarios' && (
-                  <div className="horarios-tab">
-                    <h4>Disponibilidad</h4>
-                    <div className="horarios-container">
-                      <ul className="horarios-list">
-                        {horariosDisponibles.map((horario) => (
-                          <li key={horario.dia} className={horario.disponible ? "horario-disponible" : "horario-no-disponible"}>
-                            <span className="dia">{horario.dia}</span>
-                            <span className="estado-disponibilidad">
+                </div>
+              )}
+              
+              {/* Tab de Horarios Disponibles */}
+              {activeTab === 'horarios' && (
+                <div className="horarios-tab">
+                  <h4>Disponibilidad Semanal</h4>
+                  <div className="horarios-container">
+                    <div className="horarios-list">
+                      {horariosDisponibles.map((horario) => (
+                        <div 
+                          key={horario.dia} 
+                          className={`horario-item ${horario.disponible ? 'disponible' : 'no-disponible'}`}
+                        >
+                          <div className="horario-info">
+                            <span className="horario-dia">{horario.dia}</span>
+                            <span className="horario-estado">
                               {horario.disponible ? 'Disponible' : 'No Disponible'}
                             </span>
-                            <button 
-                              className="toggle-day-btn" 
-                              onClick={() => toggleDayAvailability(horario.dia)}
-                              title={`Cambiar disponibilidad de ${horario.dia}`}
-                            >
-                              <i className="fa fa-refresh"></i>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    
-                    <div className="disponibilidad-info">
-                      <h4>Información Adicional</h4>
-                      <p>Este conductor trabaja principalmente en turno {selectedConductor.nombre.length % 2 === 0 ? 'diurno' : 'nocturno'}.</p>
-                      <p>Áreas de servicio: Centro de la ciudad, Zona Norte, Aeropuerto.</p>
+                          </div>
+                          <button 
+                            className="btn-toggle-availability" 
+                            onClick={() => toggleDayAvailability(horario.dia)}
+                            title={`Cambiar disponibilidad de ${horario.dia}`}
+                          >
+                            <i className="fa fa-refresh"></i>
+                            <span>Cambiar</span>
+                          </button>
+                        </div>
+                      ))}
                     </div>
                     
                     <div className="horarios-actions">
                       <button
-                        className="btn-edit"
+                        className="btn-save"
                         onClick={saveHorarios}
                       >
-                        Guardar Cambios
+                        <i className="fa fa-save"></i>
+                        Guardar Horarios
                       </button>
                     </div>
                   </div>
-                )}
-                
-                {/* Tab de Historial de Viajes */}
-                {activeTab === 'viajes' && (
-                  <div className="viajes-tab">
-                    <h4>Historial de Viajes</h4>
-                    {historialViajes.length > 0 ? (
-                      <ul className="viajes-list">
-                        {historialViajes.map((viaje) => (
-                          <li key={viaje.id} className="viaje-item">
-                            <div className="viaje-info">
-                              <div className="viaje-fecha">{viaje.fecha}</div>
-                              <div className="viaje-ruta">
-                                <span className="origen">{viaje.origen || 'Origen no especificado'}</span>
-                                <span className="separator">➝</span>
-                                <span className="destino">{viaje.destino || 'Destino no especificado'}</span>
-                              </div>
-                              {viaje.calificacion && (
-                                <div className="viaje-calificacion">
-                                  {Array(5).fill().map((_, i) => (
-                                    <span key={i} className={i < viaje.calificacion ? "star filled" : "star"}>★</span>
-                                  ))}
-                                </div>
-                              )}
+                </div>
+              )}
+              
+              {/* Tab de Historial de Viajes */}
+              {activeTab === 'viajes' && (
+                <div className="viajes-tab">
+                  <h4>Historial de Viajes</h4>
+                  {historialViajes.length > 0 ? (
+                    <div className="viajes-list">
+                      {historialViajes.map((viaje) => (
+                        <div key={viaje.id} className="viaje-item">
+                          <div className="viaje-header">
+                            <div className="viaje-fecha">{viaje.fecha}</div>
+                            <div className="viaje-calificacion">
+                              {[...Array(5)].map((_, i) => (
+                                <span key={i} 
+                                  className={i < (viaje.calificacion || 0) ? "star-filled" : "star-empty"}>
+                                  ★
+                                </span>
+                              ))}
                             </div>
-                            {viaje.clienteNombre && (
-                              <div className="viaje-cliente">
-                                <strong>Cliente:</strong> {viaje.clienteNombre}
-                              </div>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="no-data">No hay viajes registrados para este conductor.</p>
-                    )}
-                  </div>
-                )}
-                
-                {/* Tab de Comentarios */}
-                {activeTab === 'comentarios' && (
-                  <div className="comentarios-tab">
-                    <h4>Comentarios de Clientes</h4>
-                    
-                    {/* Lista de comentarios */}
-                    {comentariosClientes.length > 0 ? (
-                      <ul className="comentarios-list">
-                        {comentariosClientes.map((comentario) => (
-                          <li key={comentario.id} className="comentario-item">
-                            <div className="comentario-header">
-                              <strong>{comentario.cliente || 'Cliente'}</strong>
-                              <span className="comentario-fecha">{comentario.fecha}</span>
+                          </div>
+                          <div className="viaje-route">
+                            <span className="viaje-origen">{viaje.origen || 'Origen no especificado'}</span>
+                            <span className="viaje-arrow">→</span>
+                            <span className="viaje-destino">{viaje.destino || 'Destino no especificado'}</span>
+                          </div>
+                          {viaje.clienteNombre && (
+                            <div className="viaje-cliente">
+                              <i className="fa fa-user-circle"></i>
+                              <span>{viaje.clienteNombre}</span>
                             </div>
-                            <div className="comentario-mensaje">
-                              {comentario.mensaje}
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="no-data">
+                      <i className="fa fa-car"></i>
+                      <p>No hay viajes registrados para este conductor.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Tab de Comentarios */}
+              {activeTab === 'comentarios' && (
+                <div className="comentarios-tab">
+                  <h4>Comentarios de Clientes</h4>
+                  
+                  {/* Lista de comentarios */}
+                  {comentariosClientes.length > 0 ? (
+                    <div className="comentarios-list">
+                      {comentariosClientes.map((comentario) => (
+                        <div key={comentario.id} className="comentario-item">
+                          <div className="comentario-header">
+                            <div className="comentario-autor">
+                              <i className="fa fa-user-circle"></i>
+                              <span>{comentario.cliente || 'Cliente'}</span>
                             </div>
-                            <div className="comentario-acciones">
-                              <button 
-                                className="btn-delete-comment"
-                                onClick={() => deleteComentario(comentario.id)}
-                              >
-                                <i className="fa fa-trash"></i> Eliminar
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="no-data">No hay comentarios registrados para este conductor.</p>
-                    )}
-                  </div>
-                )}
-              </div>
+                            <div className="comentario-fecha">{comentario.fecha}</div>
+                          </div>
+                          <div className="comentario-body">
+                            {comentario.mensaje}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="no-data">
+                      <i className="fa fa-comments"></i>
+                      <p>No hay comentarios registrados para este conductor.</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
+        </div>
+      )}
+      
+      {/* Sistema de notificaciones */}
+      {notificacion.visible && (
+        <div className={`notification notification-${notificacion.tipo}`}>
+          <span className="notification-message">{notificacion.mensaje}</span>
+          <button 
+            className="notification-close" 
+            onClick={() => setNotificacion(prev => ({ ...prev, visible: false }))}
+          >
+            <i className="fa fa-times"></i>
+          </button>
         </div>
       )}
     </div>
