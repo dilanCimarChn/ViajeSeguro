@@ -130,6 +130,8 @@ button {
   width: 100%;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  position: relative; /* AÑADIDO: Crucial para el buen funcionamiento del ::after */
+  overflow: hidden; /* AÑADIDO: Para contener el efecto dentro del botón */
 }
 
 .reg-login-button:hover,
@@ -256,6 +258,7 @@ button::after {
   opacity: 0;
   transition: all 0.5s;
   border-radius: 10px;
+  pointer-events: none; /* AÑADIDO: Evita capturar eventos del mouse */
 }
 
 .reg-login-button:active::after,
@@ -263,4 +266,15 @@ button::after {
 button:active::after {
   opacity: 1;
   transition: 0s;
+}
+
+/* ===== CORRECCIÓN PARA PROBLEMAS DE SELECCIÓN ===== */
+/* Solución alternativa si el problema persiste */
+.dashboard-layout {
+  user-select: none; /* Previene selección de texto no deseada */
+}
+
+/* Permitir selección solo donde sea necesario */
+input, textarea, [contenteditable="true"] {
+  user-select: text;
 }
