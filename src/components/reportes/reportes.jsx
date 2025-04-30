@@ -2143,4 +2143,4 @@ doc.text(`Total de conductores: ${dataToExport.length}`, margin, finalY + 30);
   );
 };
 
-export default Reportes;
+export default Reportes
