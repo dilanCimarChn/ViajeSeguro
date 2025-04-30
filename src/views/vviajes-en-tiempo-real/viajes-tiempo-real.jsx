@@ -571,22 +571,7 @@ const VistaViajesTiempoReal = () => {
             ))}
           </select>
         </div>
-        <div className="acciones">
-          <button 
-            onClick={crearDatosPrueba} 
-            className="btn-secundario" 
-            disabled={creandoDatos}
-          >
-            {creandoDatos ? 'Creando datos...' : 'Crear datos de prueba'}
-          </button>
-          <button 
-            onClick={agregarNuevoViaje} 
-            className="btn-principal" 
-            disabled={loading || conductores.length === 0}
-          >
-            {loading ? 'Cargando...' : 'Nuevo Viaje (Demo)'}
-          </button>
-        </div>
+        
       </div>
       
       {/* Mapa de posiciones */}

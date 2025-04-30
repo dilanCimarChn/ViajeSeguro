@@ -413,9 +413,6 @@ const VistaViajesTiempoReal = () => {
             ))}
           </select>
         </div>
-        <button onClick={agregarNuevoViaje} className="btn-principal" disabled={loading}>
-          {loading ? 'Cargando...' : 'Nuevo Viaje (Demo)'}
-        </button>
       </div>
       
       {/* Mapa de posiciones */}
