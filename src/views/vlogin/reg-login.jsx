@@ -123,40 +123,26 @@ function RegLogin({ setUserRole }) {
   };
 
   return (
-    <div className="reg-login-container">
-      <div className="reg-login-box">
-        <h2>Iniciar Sesión prueba cono las credenciales user = ded@gmail.com  password = admin44</h2>
-        <p className="reg-login-description">Bienvenido de nuevo, ingresa tus credenciales</p>
-        <div className="reg-login-form">
-          <label htmlFor="email">Email</label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            placeholder="Correo electrónico"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-          />
-
-          <label htmlFor="password">Contraseña</label>
-          <div className="password-container">
-            <input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="Contraseña"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-          </div>
-
-          <button className="reg-login-button" onClick={handleIngresarClick} disabled={loading}>
-            {loading ? 'Cargando...' : 'Ingresar'}
-          </button>
-          {error && <p className="reg-login-error-text">{error}</p>}
-        </div>
+    <div className="login-container">
+      <div className="login-card">
+        <img src="https://i.ibb.co/xtN8mjLv/logo.png" alt="Login" className="login-image" />
+        <h2>Iniciar sesión</h2>
+        <input
+          type="email"
+          placeholder="Correo electrónico"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <input
+          type="password"
+          placeholder="Contraseña"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        {error && <p className="error-message">{error}</p>}
+        <button onClick={handleIngresarClick} disabled={loading}>
+          {loading ? 'Cargando...' : 'Ingresar'}
+        </button>
       </div>
     </div>
   );
