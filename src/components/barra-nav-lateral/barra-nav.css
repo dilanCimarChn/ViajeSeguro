@@ -1,167 +1,210 @@
-/* barra-nav.css */
-/* Contenedor principal */
+
+/* barra-nav.css - Versión refinada y optimizada */
+
+/* ===================== VARIABLES ===================== */
+:root {
+  --primary-color: #28a58f;
+  --secondary-color: #313940;
+  --background-light: #f5f5f5;
+  --accent-color: #038C65;
+  --border-color: #e3e3e3;
+  --text-main: #333333;
+  --text-light: #666666;
+  --sidebar-width: 240px;
+  --sidebar-width-mobile: 220px;
+  --transition-ease: all 0.3s ease-in-out;
+}
+
+/* ===================== CONTENEDOR ===================== */
 .barra-nav-lateral {
-  /* Este es un contenedor posicionado de forma relativa para los elementos del sidebar */
   position: relative;
 }
 
-/* Sidebar a la izquierda */
+/* ===================== SIDEBAR ===================== */
 .sidebar {
-  width: 220px;
-  background-color: #4caf50;
+  width: var(--sidebar-width);
+  background-color: var(--secondary-color);
   color: white;
   height: 100%;
-  padding: 20px;
-  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.15);
+  padding: 24px 20px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
   overflow-y: auto;
-  transition: transform 0.3s ease-in-out;
+  transition: var(--transition-ease);
   z-index: 1000;
   position: fixed;
   top: 0;
   left: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .sidebar.hidden {
   transform: translateX(-100%);
 }
 
-/* Logo section */
+/* ===================== LOGO ===================== */
 .logo {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 36px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .logo-image {
   width: 60px;
   height: 60px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2));
 }
 
 .logo h2 {
   margin: 10px 0 5px;
   font-size: 18px;
-  font-weight: bold;
-  color: white !important;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--primary-color);
 }
 
 .logo p {
   margin: 0;
   font-size: 12px;
-  opacity: 0.9;
-  color: white !important;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
-/* Navegación */
+/* ===================== NAVEGACIÓN ===================== */
 .nav-links {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .nav-button {
-  display: block;
-  padding: 12px 15px;
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
   background-color: transparent;
-  color: white !important;
+  color: rgba(255, 255, 255, 0.8);
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   text-align: left;
   text-decoration: none;
   font-size: 14px;
-  transition: background-color 0.2s ease;
+  font-weight: 500;
+  transition: var(--transition-ease);
 }
 
-.nav-button:hover, 
+.nav-button:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--primary-color);
+}
+
 .nav-button.active {
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(40, 165, 143, 0.15);
+  color: var(--primary-color);
+  font-weight: 600;
 }
 
-/* Botón de logout */
+/* ===================== BOTÓN LOGOUT ===================== */
 .logout-button {
-  margin-top: 20px;
-  background-color: #e74c3c !important;
+  margin-top: 24px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ff5252;
+  cursor: pointer;
 }
 
 .logout-button:hover {
-  background-color: #c0392b !important;
+  background-color: rgba(255, 59, 59, 0.1);
+  border-color: rgba(255, 59, 59, 0.2);
 }
 
-/* Botón de toggle para el sidebar */
+/* ===================== BOTÓN TOGGLE ===================== */
 .toggle-btn {
-  position: fixed !important;
-  top: 20px !important;
-  left: 240px !important;
-  z-index: 1100 !important;
-  background-color: #4caf50 !important;
-  color: white !important;
-  border: none !important;
-  border-radius: 50% !important;
-  width: 40px !important;
-  height: 40px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  cursor: pointer !important;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
-  transition: left 0.3s ease !important;
+  position: fixed;
+  top: 20px;
+  left: calc(var(--sidebar-width) + 8px);
+  z-index: 1100;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: var(--transition-ease);
+  font-size: 14px;
+}
+
+.toggle-btn:hover {
+  background-color: var(--accent-color);
+  transform: scale(1.05);
 }
 
 .sidebar.hidden ~ .toggle-btn {
-  left: 20px !important;
+  left: 20px;
 }
 
-/* Estilos para scrollbar */
+/* ===================== SCROLLBAR ===================== */
 .sidebar::-webkit-scrollbar {
-  width: 5px;
+  width: 4px;
 }
 
 .sidebar::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .sidebar::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.2);
   border-radius: 10px;
 }
 
-/* ========== RESPONSIVE ========== */
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* ===================== RESPONSIVE ===================== */
 @media (max-width: 1024px) {
   .toggle-btn {
-    left: 20px !important;
+    left: 20px;
   }
-  
+
   .sidebar:not(.hidden) ~ .toggle-btn {
-    left: 240px !important;
+    left: calc(var(--sidebar-width) + 8px);
   }
 }
 
 @media (max-width: 576px) {
   .sidebar {
-    width: 200px;
-    padding: 15px;
+    width: var(--sidebar-width-mobile);
+    padding: 20px 16px;
   }
-  
+
   .nav-button {
-    padding: 10px;
+    padding: 10px 14px;
     font-size: 13px;
   }
-  
+
   .logo h2 {
     font-size: 16px;
   }
-  
+
   .toggle-btn {
-    width: 35px !important;
-    height: 35px !important;
+    width: 32px;
+    height: 32px;
   }
-  
+
   .sidebar:not(.hidden) ~ .toggle-btn {
-    left: 220px !important;
+    left: calc(var(--sidebar-width-mobile) + 8px);
   }
 }
 
-/* Ajustes adicionales para evitar duplicación */
+/* ===================== AJUSTES FINALES ===================== */
 #toggle-btn-unique:not(:first-of-type) {
-  display: none !important;
+  display: none;
 }

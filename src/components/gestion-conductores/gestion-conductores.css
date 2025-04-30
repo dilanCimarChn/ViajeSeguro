@@ -90,7 +90,7 @@ body {
 .green-underline {
   width: 80px;
   height: 4px;
-  background-color: var(--primary-color);
+  background-color: #007293;
   margin: 0 auto;
   border-radius: var(--radius-small);
 }
@@ -247,7 +247,7 @@ body {
   justify-content: center;
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
-  background-color: var(--primary-color);
+  background-color: #007293;
   color: var(--white-color);
   border: none;
   border-radius: var(--radius-medium);
@@ -257,7 +257,7 @@ body {
 }
 
 .btn-primary:hover {
-  background-color: var(--primary-hover);
+  background-color: #006080;
   transform: translateY(-2px);
   box-shadow: var(--shadow-small);
 }
@@ -360,7 +360,7 @@ body {
 }
 
 .conductores-table th {
-  background-color: var(--primary-color);
+  background-color: #007293;
   color: var(--white-color);
   padding: 1rem 0.75rem;
   font-weight: 700;
@@ -472,7 +472,7 @@ body {
   display: inline-block;
   width: 8px;
   height: 8px;
-  background-color: var(--success-color);
+  background-color: #008e85;
   border-radius: 50%;
   margin-right: 6px;
 }
@@ -534,27 +534,27 @@ body {
 }
 
 .btn-edit {
-  background-color: var(--primary-color);
+  background-color: #007293;
 }
 
 .btn-edit:hover {
-  background-color: var(--primary-hover);
+  background-color: #006080;
 }
 
 .btn-deactivate {
-  background-color: var(--warning-color);
+  background-color: #9c613a;
 }
 
 .btn-deactivate:hover {
-  background-color: var(--warning-hover);
+  background-color: #8a5430;
 }
 
 .btn-activate {
-  background-color: var(--success-color);
+  background-color: #008e85;
 }
 
 .btn-activate:hover {
-  background-color: var(--success-hover);
+  background-color: #007a73;
 }
 
 .btn-profile {
@@ -809,7 +809,7 @@ body {
 
 .btn-save {
   padding: 0.75rem 1.5rem;
-  background-color: var(--primary-color);
+  background-color: #007293;
   color: var(--white-color);
   border: none;
   border-radius: var(--radius-medium);
@@ -819,7 +819,7 @@ body {
 }
 
 .btn-save:hover {
-  background-color: var(--primary-hover);
+  background-color: #006080;
   transform: translateY(-2px);
   box-shadow: var(--shadow-small);
 }
@@ -865,7 +865,7 @@ body {
   bottom: -1px;
   width: 100%;
   height: 3px;
-  background-color: var(--primary-color);
+  background-color: #007293;
 }
 
 /* Tab de información */
@@ -957,27 +957,27 @@ body {
 }
 
 .btn-modal-action {
-  background-color: var(--primary-color);
+  background-color: #007293;
 }
 
 .btn-modal-action:hover {
-  background-color: var(--primary-hover);
+  background-color: #006080;
 }
 
 .btn-modal-deactivate {
-  background-color: var(--warning-color);
+  background-color: #9c613a;
 }
 
 .btn-modal-deactivate:hover {
-  background-color: var(--warning-hover);
+  background-color: #8a5430;
 }
 
 .btn-modal-activate {
-  background-color: var(--success-color);
+  background-color: #008e85;
 }
 
 .btn-modal-activate:hover {
-  background-color: var(--success-hover);
+  background-color: #007a73;
 }
 
 /* Tab de Horarios */
@@ -1059,7 +1059,7 @@ body {
 }
 
 .btn-toggle-availability:hover {
-  background-color: var(--primary-color);
+  background-color: #007293;
   color: var(--white-color);
 }
 

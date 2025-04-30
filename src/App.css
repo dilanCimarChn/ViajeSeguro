@@ -1,109 +1,57 @@
-/* App.css */
-/* Estilos básicos de la aplicación */
+/* App.css - Solo estilos globales básicos */
 
 /* Reseteo básico */
 * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f5f5f5;
+  color: #333;
+  line-height: 1.6;
+}
+
+#root, .App {
+  min-height: 100vh;
+}
+
+/* Correcciones para el sidebar */
+.toggle-btn:not(:first-of-type) {
+  display: none !important;
+}
+
+/* Prevenir problemas con barras duplicadas */
+.dashboard-layout .dashboard-layout {
+  display: none !important;
+}
+
+/* Variables globales que pueden ser usadas en toda la app */
+:root {
+  /* Paleta principal (solo definiciones, no aplicaciones) */
+  --color-primary: #28a58f;
+  --color-secondary: #313940;
+  --color-light: #f5f5f5;
+  --color-white: #ffffff;
+  --color-dark: #333333;
+  --color-text: #3c4858;
   
-  body {
-    font-family: Arial, sans-serif;
-    background-color: #f5f5f5;
-    color: #333;
-  }
+  /* Espaciado */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
   
-  #root, .App {
-    height: 100vh;
-  }
+  /* Bordes */
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 16px;
   
-  /* Correcciones para el sidebar */
-  .toggle-btn:not(:first-of-type) {
-    display: none !important;
-  }
-  
-  /* Prevenir problemas con barras duplicadas */
-  .dashboard-layout .dashboard-layout {
-    display: none !important;
-  }
-  
-  /* Títulos y textos */
-  h1, h2, h3, h4, h5, h6 {
-    margin-bottom: 15px;
-    color: #333;
-  }
-  
-  p {
-    margin-bottom: 15px;
-  }
-  
-  /* Formularios */
-  input, select, textarea {
-    display: block;
-    width: 100%;
-    padding: 10px;
-    margin-bottom: 15px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-  }
-  
-  label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: bold;
-  }
-  
-  /* Botones */
-  button, .btn {
-    padding: 10px 15px;
-    background-color: #4caf50;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-  }
-  
-  button:hover, .btn:hover {
-    background-color: #45a049;
-  }
-  
-  .btn-danger {
-    background-color: #e74c3c;
-  }
-  
-  .btn-danger:hover {
-    background-color: #c0392b;
-  }
-  
-  /* Containers */
-  .container {
-    padding: 20px;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    margin-bottom: 20px;
-  }
-  
-  /* Tablas */
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 20px;
-  }
-  
-  th, td {
-    padding: 12px 15px;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-  }
-  
-  th {
-    background-color: #4caf50;
-    color: white;
-  }
-  
-  tr:hover {
-    background-color: #f5f5f5;
-  }
+  /* Sombras */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+}

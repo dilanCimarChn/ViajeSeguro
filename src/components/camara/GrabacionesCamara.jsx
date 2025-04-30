@@ -15,8 +15,9 @@ import {
 import L from 'leaflet';
 import { db } from '../../utils/firebase';
 import 'leaflet/dist/leaflet.css';
-import '/Users/CAPRI/Desktop/a/ViajeSeguro/src/views/vviajes-en-tiempo-real/viajes-tiempo-real.css';
-
+//import '/Users/CAPRI/Desktop/a/ViajeSeguro/src/views/vviajes-en-tiempo-real/viajes-tiempo-real.css';
+import "../viajes-tiempo-real/viajes-tiempo-real.css"
+import "./Camara.css"
 // Icono personalizado para los marcadores
 const iconoVehiculo = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
