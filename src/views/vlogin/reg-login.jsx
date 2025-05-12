@@ -16,17 +16,11 @@ function RegLogin({ setUserRole }) {
   const [loginLoading, setLoginLoading] = useState(false);
 
   useEffect(() => {
-    // Limpieza previa al montar
-    // Si estamos en la página de login, verificamos si hay un usuario activo
-    // pero evitamos validar automáticamente la sesión
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         console.log("Usuario detectado en sesión:", user.email);
-        
-        // Si estamos explícitamente en la página de login,
-        // no validamos automáticamente - esperamos que el usuario inicie sesión
+
         const isLoginPage = window.location.pathname === '/login';
-        
         if (isLoginPage) {
           console.log("En página de login con sesión activa - esperando acción del usuario");
           setInitialLoading(false);
@@ -42,7 +36,6 @@ function RegLogin({ setUserRole }) {
     return () => unsubscribe();
   }, [auth]);
 
-  // Validar usuario en Firestore y registrar sesión
   const validarSesion = async (user) => {
     try {
       const q = query(collection(db, 'usuarios'), where('email', '==', user.email));
@@ -66,13 +59,12 @@ function RegLogin({ setUserRole }) {
           localStorage.setItem('userRole', userData.role);
           setUserRole(userData.role);
           
-          // Navegar según el rol del usuario
           if (userData.role === 'admin') {
             navigate('/gestion-usuarios');
           } else if (userData.role === 'receptionist') {
             navigate('/gestion-clientes');
           } else {
-            navigate('/gestion-usuarios'); // Ruta por defecto
+            navigate('/gestion-usuarios');
           }
         } else {
           console.error("Cuenta deshabilitada.");
@@ -90,7 +82,6 @@ function RegLogin({ setUserRole }) {
           await signOut(auth);
         }
       } else {
-        // Usuario no encontrado en Firestore
         console.error("Usuario no encontrado en Firestore");
         await signOut(auth);
         setError("Usuario no registrado en el sistema");
@@ -119,7 +110,6 @@ function RegLogin({ setUserRole }) {
       setError('');
       setLoginLoading(true);
 
-      // Validación básica del email
       const emailTrimmed = email.trim();
       if (!emailTrimmed || !emailTrimmed.includes('@')) {
         setError('Por favor, ingresa un correo electrónico válido');
@@ -127,7 +117,6 @@ function RegLogin({ setUserRole }) {
         return;
       }
 
-      // Validación básica de la contraseña
       if (!password || password.length < 6) {
         setError('La contraseña debe tener al menos 6 caracteres');
         setLoginLoading(false);
@@ -138,8 +127,6 @@ function RegLogin({ setUserRole }) {
       const user = userCredential.user;
 
       console.log('Usuario autenticado:', user.email);
-      // Llamamos explícitamente a validarSesion, ya que en la página de login
-      // el listener de onAuthStateChanged no lo hace automáticamente
       await validarSesion(user);
     } catch (error) {
       console.error("Error en login:", error);
@@ -151,8 +138,7 @@ function RegLogin({ setUserRole }) {
         'autenticacion',
         'fallido'
       );
-      
-      // Mensajes de error más descriptivos
+
       let errorMessage = 'Credenciales incorrectas';
       if (error.code === 'auth/user-not-found') {
         errorMessage = 'No existe una cuenta con este correo electrónico';
@@ -163,7 +149,7 @@ function RegLogin({ setUserRole }) {
       } else if (error.code === 'auth/user-disabled') {
         errorMessage = 'Tu cuenta está deshabilitada. Contacta al administrador';
       }
-      
+
       setError(errorMessage);
       setLoginLoading(false);
     }
@@ -172,6 +158,7 @@ function RegLogin({ setUserRole }) {
   return (
     <div className="login-container">
       <div className="login-card">
+        <img src="https://i.ibb.co/xtN8mjLv/logo.png" alt="Logo" className="login-image" />
         <h2>Iniciar sesión</h2>
         <input
           type="email"
