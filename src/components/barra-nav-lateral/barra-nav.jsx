@@ -1,16 +1,25 @@
-// BarraNav.jsx
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { getAuth, signOut } from 'firebase/auth';
 import './barra-nav.css';
 
-const BarraNavLateral = () => {
+const BarraNavLateral = ({ handleLogout: appHandleLogout }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const userRole = localStorage.getItem('userRole') || 'admin';
-  
-  // Estado para controlar la visibilidad del sidebar
+  const [userRole, setUserRole] = useState(null);
   const [isVisible, setIsVisible] = useState(true);
-  
+  const auth = getAuth();
+
+  // Cargar userRole desde localStorage solo una vez
+  useEffect(() => {
+    const role = localStorage.getItem('userRole');
+    setUserRole(role);
+    const savedVisibility = localStorage.getItem('sidebarVisible');
+    if (savedVisibility !== null) {
+      setIsVisible(savedVisibility === 'true');
+    }
+  }, []);
+
   const navOptions = {
     admin: [
       { path: '/gestion-usuarios', label: 'Gestión de Administradores' },
@@ -30,32 +39,41 @@ const BarraNavLateral = () => {
       { path: '/configuracion', label: 'Configuración' },
     ],
   };
-  
+
   const userNavOptions = navOptions[userRole] || [];
 
+  // Utilizar el método de logout proporcionado por App si está disponible,
+  // de lo contrario, implementar una versión segura aquí
   const handleLogout = async () => {
     try {
-      localStorage.removeItem('userRole');
-      navigate('/login');
+      if (appHandleLogout) {
+        // Usar el manejador de logout proporcionado por App.jsx
+        appHandleLogout();
+      } else {
+        console.log("Iniciando proceso de logout desde barra lateral");
+        
+        // Limpiar datos de usuario
+        localStorage.removeItem('userRole');
+        
+        // Cerrar sesión de Firebase
+        await signOut(auth);
+        
+        // Redirigir a login con redirección dura
+        window.location.href = '/login';
+      }
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
+      alert("Error al cerrar sesión. Intenta recargar la página.");
     }
   };
 
-  // Función para alternar la visibilidad del sidebar
   const toggleSidebar = () => {
-    setIsVisible(!isVisible);
-    // Guardar preferencia en localStorage
-    localStorage.setItem('sidebarVisible', !isVisible);
+    const newVisibility = !isVisible;
+    setIsVisible(newVisibility);
+    localStorage.setItem('sidebarVisible', newVisibility);
   };
 
-  // Recuperar preferencia de visibilidad al cargar el componente
-  useEffect(() => {
-    const savedVisibility = localStorage.getItem('sidebarVisible');
-    if (savedVisibility !== null) {
-      setIsVisible(savedVisibility === 'true');
-    }
-  }, []);
+  if (!userRole) return null; // Evita render si el rol aún no está cargado
 
   return (
     <div className="barra-nav-lateral">
@@ -69,7 +87,6 @@ const BarraNavLateral = () => {
           <h2>VIAJE SEGURO</h2>
           <p>PANEL DE {userRole === 'admin' ? 'ADMINISTRADOR' : 'RECEPCIONISTA'}</p>
         </div>
-        
         <div className="nav-links">
           {userNavOptions.map((option) => (
             <Link 
@@ -87,7 +104,6 @@ const BarraNavLateral = () => {
           </button>
         </div>
       </div>
-      
       <button id="toggle-btn-unique" className="toggle-btn" onClick={toggleSidebar}>
         {isVisible ? '❮' : '❯'}
       </button>

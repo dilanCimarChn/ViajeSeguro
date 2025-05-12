@@ -5,47 +5,115 @@ import {
   getDocs,
   updateDoc,
   doc,
-  onSnapshot
+  onSnapshot,
+  query,
+  where
 } from 'firebase/firestore';
 import {
   getAuth,
   createUserWithEmailAndPassword,
   updatePassword,
   signInWithEmailAndPassword,
+  onAuthStateChanged,
   signOut
 } from 'firebase/auth';
 import { db } from '../../utils/firebase';
 import './gestion-usuarios.css';
 
 const GestionUsuarios = () => {
-  // Estados
+  // Estados para manejo de formularios y datos
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
+    nombres: '',
+    apellidoPaterno: '',
+    apellidoMaterno: '',
+    ci: '',
+    genero: 'masculino',
+    celular: '',
     role: 'receptionist',
   });
+  
+  // Estados de la aplicación
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [newPassword, setNewPassword] = useState('');
+  const [usuarioActual, setUsuarioActual] = useState(null);
+  const [modalCambioClave, setModalCambioClave] = useState(false);
+  const [nuevaClave, setNuevaClave] = useState('');
+  const [confirmarClave, setConfirmarClave] = useState('');
+  const [showNewUserModal, setShowNewUserModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [notificacion, setNotificacion] = useState({ visible: false, mensaje: '', tipo: '' });
+  const [notificacion, setNotificacion] = useState({ 
+    visible: false, 
+    mensaje: '', 
+    tipo: '' 
+  });
+  const [nuevoUsuario, setNuevoUsuario] = useState(null);
   
+  // Estados adicionales que faltaban
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  
+  // Configuraciones de autenticación
   const auth = getAuth();
+  const DOMAIN = 'vseguro.com';
 
-  // Obtener usuarios en tiempo real desde Firestore
+  // Efecto para manejar el estado de autenticación
   useEffect(() => {
-    setLoading(true);
-    const unsubscribe = onSnapshot(collection(db, 'usuarios'), (snapshot) => {
-      setUsuarios(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Buscar información del usuario en Firestore
+        const usuarioRef = query(
+          collection(db, 'usuarios'), 
+          where('uid', '==', user.uid)
+        );
+        
+        const querySnapshot = await getDocs(usuarioRef);
+        
+        if (!querySnapshot.empty) {
+          const usuarioData = querySnapshot.docs[0].data();
+          
+          // Verificar si requiere cambio de contraseña
+          if (usuarioData.requiereCambioPassword) {
+            setModalCambioClave(true);
+            setUsuarioActual({
+              ...usuarioData,
+              docId: querySnapshot.docs[0].id
+            });
+          } else {
+            setUsuarioActual(usuarioData);
+          }
+        }
+      }
     });
 
     return () => unsubscribe();
+  }, [auth]);
+
+  // Efecto para obtener usuarios
+  useEffect(() => {
+    const obtenerUsuarios = async () => {
+      try {
+        // Obtener usuarios en tiempo real desde Firestore
+        const usuariosRef = collection(db, 'usuarios');
+        const unsubscribe = onSnapshot(usuariosRef, (snapshot) => {
+          const usuariosActualizados = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setUsuarios(usuariosActualizados);
+        });
+
+        // Retornar función de limpieza
+        return () => unsubscribe();
+      } catch (error) {
+        console.error('Error al obtener usuarios:', error);
+        mostrarNotificacion('Error al cargar administradores', 'error');
+      }
+    };
+
+    obtenerUsuarios();
   }, []);
 
-  // Sistema de notificaciones
+  // Función para mostrar notificaciones
   const mostrarNotificacion = (mensaje, tipo = 'info') => {
     setNotificacion({
       visible: true,
@@ -53,55 +121,239 @@ const GestionUsuarios = () => {
       tipo
     });
     
-    // Auto-ocultar después de 3 segundos
     setTimeout(() => {
       setNotificacion(prev => ({ ...prev, visible: false }));
     }, 3000);
   };
 
-  // Manejo de inputs
+  // Función para manejar cambio de contraseña
+  const handleCambioClave = async (e) => {
+    e.preventDefault();
+    
+    // Validaciones de contraseña
+    if (nuevaClave !== confirmarClave) {
+      mostrarNotificacion('Las contraseñas no coinciden', 'error');
+      return;
+    }
+    
+    if (nuevaClave.length < 8) {
+      mostrarNotificacion('La contraseña debe tener al menos 8 caracteres', 'warning');
+      return;
+    }
+    
+    // Validar complejidad de contraseña
+    const regexMayuscula = /[A-Z]/;
+    const regexMinuscula = /[a-z]/;
+    const regexNumero = /[0-9]/;
+    const regexEspecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/;
+    
+    if (!regexMayuscula.test(nuevaClave) || 
+        !regexMinuscula.test(nuevaClave) || 
+        !regexNumero.test(nuevaClave) || 
+        !regexEspecial.test(nuevaClave)) {
+      mostrarNotificacion('La contraseña debe incluir mayúsculas, minúsculas, números y caracteres especiales', 'warning');
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      // Obtener usuario actual
+      const user = auth.currentUser;
+      
+      // Actualizar contraseña en Firebase Authentication
+      await updatePassword(user, nuevaClave);
+      
+      // Actualizar estado de cambio de contraseña en Firestore
+      await updateDoc(doc(db, 'usuarios', usuarioActual.docId), {
+        requiereCambioPassword: false,
+        fechaCambioClave: new Date().toISOString()
+      });
+      
+      // Resetear estados
+      setModalCambioClave(false);
+      setNuevaClave('');
+      setConfirmarClave('');
+      
+      mostrarNotificacion('Contraseña cambiada exitosamente', 'success');
+    } catch (error) {
+      console.error('Error al cambiar contraseña:', error);
+      mostrarNotificacion('Error al cambiar contraseña', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Restablecimiento de contraseña de usuario existente
+  const restablecerContrasena = async () => {
+    if (!selectedUser) return;
+
+    setLoading(true);
+    try {
+      // Generar nueva contraseña
+      const nuevaContraseña = generarContraseña();
+
+      // Reestablecer contraseña en Firebase
+      const userRef = doc(db, 'usuarios', selectedUser.id);
+      await updateDoc(userRef, {
+        requiereCambioPassword: true,
+        fechaRestablecimientoPassword: new Date().toISOString()
+      });
+
+      // Cerrar modal de restablecimiento
+      setShowPasswordModal(false);
+      
+      // Preparar usuario con nueva contraseña para mostrar
+      setNuevoUsuario({
+        ...selectedUser,
+        password: nuevaContraseña,
+        email: selectedUser.email
+      });
+      
+      // Mostrar modal con nueva contraseña
+      setShowNewUserModal(true);
+
+      mostrarNotificacion('Contraseña restablecida exitosamente', 'success');
+    } catch (error) {
+      console.error('Error al restablecer contraseña:', error);
+      mostrarNotificacion('Error al restablecer contraseña', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Generar correo electrónico basado en nombres
+  const generarCorreo = (nombres, apellidoPaterno, apellidoMaterno) => {
+    if (!nombres || !apellidoPaterno) return '';
+    
+    const primeraLetraNombre = nombres.trim().charAt(0).toLowerCase();
+    const apellidoPaternoLower = apellidoPaterno.trim().toLowerCase();
+    const primeraLetraMaterno = apellidoMaterno ? apellidoMaterno.trim().charAt(0).toLowerCase() : '';
+    
+    return `${primeraLetraNombre}${apellidoPaternoLower}${primeraLetraMaterno}@${DOMAIN}`;
+  };
+
+  // Generar contraseña aleatoria segura
+  const generarContraseña = (longitud = 10) => {
+    const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+';
+    const caracteresEspeciales = '!@#$%^&*()_+';
+    let contraseña = '';
+    
+    // Asegurar complejidad de contraseña
+    contraseña += caracteres.charAt(Math.floor(Math.random() * 26)); // Mayúscula
+    contraseña += caracteres.charAt(26 + Math.floor(Math.random() * 26)); // Minúscula
+    contraseña += caracteres.charAt(52 + Math.floor(Math.random() * 10)); // Número
+    contraseña += caracteresEspeciales.charAt(Math.floor(Math.random() * caracteresEspeciales.length)); // Carácter especial
+    
+    // Completar contraseña
+    for (let i = 4; i < longitud; i++) {
+      contraseña += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+    }
+    
+    // Mezclar caracteres
+    return contraseña.split('').sort(() => 0.5 - Math.random()).join('');
+  };
+
+  // Verificar si el correo ya existe
+  const verificarCorreoExistente = async (email) => {
+    try {
+      const q = query(collection(db, 'usuarios'), where('email', '==', email));
+      const querySnapshot = await getDocs(q);
+      return !querySnapshot.empty;
+    } catch (error) {
+      console.error('Error al verificar correo:', error);
+      return true; // Por seguridad, asumimos que existe en caso de error
+    }
+  };
+
+  // Manejar cambios en inputs del formulario
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
 
-  // Crear usuario en Authentication y Firestore
+  // Crear nuevo usuario
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.email || !formData.password) {
-      mostrarNotificacion('Por favor, complete todos los campos', 'warning');
+    // Validaciones básicas
+    if (!formData.nombres || !formData.apellidoPaterno || !formData.ci || !formData.celular) {
+      mostrarNotificacion('Por favor, complete todos los campos obligatorios', 'warning');
       return;
     }
     
-    if (formData.password.length < 6) {
-      mostrarNotificacion('La contraseña debe tener al menos 6 caracteres', 'warning');
+    // Validar CI (solo números y mínimo 5 dígitos)
+    if (!/^\d{5,10}$/.test(formData.ci)) {
+      mostrarNotificacion('El carnet debe contener entre 5 y 10 dígitos', 'warning');
+      return;
+    }
+    
+    // Validar celular (solo números y 8 dígitos)
+    if (!/^\d{8}$/.test(formData.celular)) {
+      mostrarNotificacion('El número de celular debe contener 8 dígitos', 'warning');
       return;
     }
     
     setLoading(true);
-
+    
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        formData.email.trim(),
-        formData.password
-      );
-
-      await addDoc(collection(db, 'usuarios'), {
-        email: formData.email.trim(),
-        password: formData.password,
+      // Generar correo electrónico
+      const email = generarCorreo(formData.nombres, formData.apellidoPaterno, formData.apellidoMaterno);
+      
+      // Verificar si el correo ya existe
+      const correoExistente = await verificarCorreoExistente(email);
+      if (correoExistente) {
+        mostrarNotificacion(`El correo ${email} ya está registrado en el sistema`, 'error');
+        setLoading(false);
+        return;
+      }
+      
+      // Generar contraseña aleatoria
+      const password = generarContraseña();
+      
+      // Crear usuario en Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Datos del usuario para Firestore
+      const userData = {
+        nombres: formData.nombres.trim(),
+        apellidoPaterno: formData.apellidoPaterno.trim(),
+        apellidoMaterno: formData.apellidoMaterno?.trim() || '',
+        ci: formData.ci.trim(),
+        genero: formData.genero,
+        celular: formData.celular.trim(),
+        email: email,
         role: formData.role,
         uid: userCredential.user.uid,
         active: true,
+        requiereCambioPassword: true,
         fechaCreacion: new Date().toISOString()
+      };
+      
+      // Guardar en Firestore
+      const docRef = await addDoc(collection(db, 'usuarios'), userData);
+      
+      // Preparar datos para mostrar en el modal
+      setNuevoUsuario({ ...userData, password, docId: docRef.id });
+      
+      // Resetear formulario
+      setFormData({
+        nombres: '',
+        apellidoPaterno: '',
+        apellidoMaterno: '',
+        ci: '',
+        genero: 'masculino',
+        celular: '',
+        role: 'receptionist',
       });
-
-      setFormData({ email: '', password: '', role: 'receptionist' });
-      mostrarNotificacion('Usuario creado correctamente', 'success');
+      
+      // Mostrar modal con datos de acceso
+      setShowNewUserModal(true);
+      
+      mostrarNotificacion('Administrador creado correctamente', 'success');
     } catch (error) {
       console.error('Error al crear usuario:', error);
-      let mensajeError = 'Error al crear usuario';
+      let mensajeError = 'Error al crear administrador';
       
       // Proporcionar mensajes de error más específicos
       if (error.code === 'auth/email-already-in-use') {
@@ -118,285 +370,436 @@ const GestionUsuarios = () => {
     }
   };
 
-  // Cambiar contraseña
-  const handleChangePassword = async (e) => {
-    e.preventDefault();
-    
-    if (!newPassword || newPassword.length < 6) {
-      mostrarNotificacion('La nueva contraseña debe tener al menos 6 caracteres', 'warning');
-      return;
-    }
-    
-    setLoading(true);
-    
-    try {
-      // Buscar usuario en Firestore
-      if (!selectedUser) {
-        throw new Error('Usuario no seleccionado');
-      }
-
-      // Cerrar sesión del usuario actual antes de cambiar la contraseña
-      await signOut(auth);
-
-      // Volver a autenticar con las credenciales del usuario que va a cambiar la contraseña
-      const userCredential = await signInWithEmailAndPassword(auth, selectedUser.email, selectedUser.password);
-      const user = userCredential.user;
-
-      // Actualizar la contraseña en Firebase Authentication
-      await updatePassword(user, newPassword);
-
-      // Actualizar la nueva contraseña en Firestore
-      await updateDoc(doc(db, 'usuarios', selectedUser.id), { password: newPassword });
-
-      setShowPasswordModal(false);
-      setNewPassword('');
-      setSelectedUser(null);
-      
-      mostrarNotificacion(`Contraseña actualizada correctamente`, 'success');
-    } catch (error) {
-      console.error('Error al actualizar la contraseña:', error);
-      mostrarNotificacion('Error al actualizar la contraseña', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Habilitar / Deshabilitar usuario
-  const toggleAccountStatus = async (userId, currentStatus) => {
-    try {
-      await updateDoc(doc(db, 'usuarios', userId), { 
-        active: !currentStatus,
-        fechaActualizacion: new Date().toISOString()
-      });
+const toggleAccountStatus = async (userId, currentStatus) => {
+  try {
+    await updateDoc(doc(db, 'usuarios', userId), { 
+      active: !currentStatus,
+      fechaActualizacion: new Date().toISOString()
+    });
 
-      const mensaje = !currentStatus ? 'Usuario activado correctamente' : 'Usuario desactivado correctamente';
-      mostrarNotificacion(mensaje, 'success');
-    } catch (error) {
-      console.error('Error al actualizar estado del usuario:', error);
-      mostrarNotificacion('Error al actualizar estado del usuario', 'error');
-    }
-  };
+    const mensaje = !currentStatus ? 'Administrador activado correctamente' : 'Administrador desactivado correctamente';
+    mostrarNotificacion(mensaje, 'success');
+  } catch (error) {
+    console.error('Error al actualizar estado del usuario:', error);
+    mostrarNotificacion('Error al actualizar estado del administrador', 'error');
+  }
+};
 
-  // Abrir modal de cambio de contraseña
-  const openPasswordModal = (user) => {
-    setSelectedUser(user);
-    setNewPassword('');
-    setShowPasswordModal(true);
-  };
+// Copiar información al portapapeles
+const copiarAlPortapapeles = (texto) => {
+  navigator.clipboard.writeText(texto)
+    .then(() => mostrarNotificacion('Información copiada al portapapeles', 'success'))
+    .catch(err => mostrarNotificacion('Error al copiar información', 'error'));
+};
 
-  // Filtrar usuarios por búsqueda
-  const filteredUsuarios = usuarios.filter(user => 
-    user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.role?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Traducir rol para mostrar
-  const traducirRol = (rol) => {
-    switch(rol) {
-      case 'admin': return 'Administrador';
-      case 'receptionist': return 'Recepcionista';
-      default: return rol;
-    }
-  };
-
+// Filtrar usuarios por búsqueda
+const filteredUsuarios = usuarios.filter(user => {
+  const searchLower = searchTerm.toLowerCase();
   return (
-    <div className="gestion-usuarios-container">
-      {/* Encabezado de sección */}
-      <div className="section-header">
-        <h2>Panel de Gestión de Usuarios</h2>
-        <div className="green-underline"></div>
-      </div>
-      
-      {/* Sección de formulario */}
-      <div className="usuarios-section">
-        <div className="form-card">
-          <h3>Registrar Nuevo Usuario</h3>
+    user.email?.toLowerCase().includes(searchLower) ||
+    user.role?.toLowerCase().includes(searchLower) ||
+    user.nombres?.toLowerCase().includes(searchLower) ||
+    user.apellidoPaterno?.toLowerCase().includes(searchLower) ||
+    user.apellidoMaterno?.toLowerCase().includes(searchLower) ||
+    user.ci?.includes(searchTerm)
+  );
+});
+
+// Traducir rol
+const traducirRol = (rol) => {
+  switch(rol) {
+    case 'admin': return 'Administrador';
+    case 'receptionist': return 'Recepcionista';
+    default: return rol;
+  }
+};// Renderizado de modal de cambio de contraseña
+const renderModalCambioClave = () => {
+  return (
+    <div className="modal-overlay">
+      <div className="modal-container">
+        <div className="modal-header">
+          <h3>Cambio de Contraseña Obligatorio</h3>
+        </div>
+        
+        <form onSubmit={handleCambioClave} className="modal-body">
+          <p>Por seguridad, debe cambiar su contraseña en el primer inicio de sesión.</p>
           
-          <form onSubmit={handleSubmit} className="usuario-form">
-            <div className="form-grid">
-              <div className="form-group">
-                <label htmlFor="email">Correo Electrónico</label>
-                <input 
-                  type="email" 
-                  id="email"
-                  name="email" 
-                  value={formData.email} 
-                  onChange={handleInputChange} 
-                  required 
-                />
-              </div>
-              
-              <div className="form-group">
-                <label htmlFor="password">Contraseña</label>
-                <input 
-                  type="password" 
-                  id="password"
-                  name="password" 
-                  value={formData.password} 
-                  onChange={handleInputChange} 
-                  required 
-                />
-              </div>
-              
-              <div className="form-group">
-                <label htmlFor="role">Tipo de Usuario</label>
-                <select 
-                  id="role"
-                  name="role" 
-                  value={formData.role} 
-                  onChange={handleInputChange}
-                >
-                  <option value="receptionist">Recepcionista</option>
-                  <option value="admin">Administrador</option>
-                </select>
-              </div>
-            </div>
-            
-            <div className="form-actions">
-              <button type="submit" className="btn-primary" disabled={loading}>
-                {loading ? 'Creando...' : 'Crear Nuevo Usuario'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-      
-      {/* Sección de lista de usuarios */}
-      <div className="usuarios-section">
-        <h3>Usuarios Registrados en el Sistema</h3>
-        
-        <div className="search-bar">
-          <input
-            type="text"
-            placeholder="Buscar por correo o tipo de usuario"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
-          />
-        </div>
-        
-        {loading && (
-          <div className="loading-container">
-            <div className="loading-spinner"></div>
-            <p className="loading-message">Cargando usuarios...</p>
+          <div className="form-group">
+            <label htmlFor="nuevaClave">Nueva Contraseña</label>
+            <input 
+              type="password"
+              id="nuevaClave"
+              value={nuevaClave}
+              onChange={(e) => setNuevaClave(e.target.value)}
+              required
+              minLength={8}
+            />
           </div>
-        )}
-        
-        {!loading && filteredUsuarios.length === 0 && (
-          <div className="no-results">
-            <i className="fa fa-exclamation-circle"></i>
-            <p>No hay usuarios que coincidan con la búsqueda.</p>
+          
+          <div className="form-group">
+            <label htmlFor="confirmarClave">Confirmar Nueva Contraseña</label>
+            <input 
+              type="password"
+              id="confirmarClave"
+              value={confirmarClave}
+              onChange={(e) => setConfirmarClave(e.target.value)}
+              required
+              minLength={8}
+            />
           </div>
-        )}
-        
-                        {!loading && filteredUsuarios.length > 0 && (
-          <div className="table-container">
-            <table className="usuarios-table">
-              <thead>
-                <tr>
-                  <th>Correo Electrónico</th>
-                  <th>Tipo de Usuario</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsuarios.map(user => (
-                  <tr key={user.id} className={user.active ? 'row-active' : 'row-inactive'}>
-                    <td data-label="Correo Electrónico">{user.email}</td>
-                    <td data-label="Tipo de Usuario">{traducirRol(user.role)}</td>
-                    <td data-label="Estado">
-                      <span className={`status-badge ${user.active ? 'active' : 'inactive'}`}>
-                        {user.active ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </td>
-                    <td data-label="Acciones">
-                      <div className="action-buttons">
-                        <button 
-                          onClick={() => openPasswordModal(user)} 
-                          className="btn-table-action btn-password"
-                        >
-                          <i className="fa fa-key"></i>
-                          <span>Cambiar Contraseña</span>
-                        </button>
-                        <button 
-                          onClick={() => toggleAccountStatus(user.id, user.active)} 
-                          className={`btn-table-action ${user.active ? 'btn-deactivate' : 'btn-activate'}`}
-                        >
-                          <i className={user.active ? "fa fa-toggle-on" : "fa fa-toggle-off"}></i>
-                          <span>{user.active ? 'Desactivar' : 'Activar'}</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          
+          <div className="form-info">
+            <p><small>La contraseña debe contener:</small></p>
+            <ul>
+              <li>Mínimo 8 caracteres</li>
+              <li>Al menos una mayúscula</li>
+              <li>Al menos una minúscula</li>
+              <li>Al menos un número</li>
+              <li>Al menos un carácter especial</li>
+            </ul>
           </div>
-        )}
-        
-        {/* Modal para cambiar contraseña */}
-        {showPasswordModal && (
-          <div className="modal-overlay">
-            <div className="modal-container">
-              <div className="modal-header">
-                <h3>Cambiar Contraseña</h3>
-                <button 
-                  className="close-button" 
-                  onClick={() => setShowPasswordModal(false)}
-                >
-                  &times;
-                </button>
-              </div>
-              
-              <div className="modal-body">
-                <p className="modal-info">
-                  Cambiando contraseña para: <strong>{selectedUser?.email}</strong>
-                </p>
-                
-                <form onSubmit={handleChangePassword}>
-                  <div className="form-group">
-                    <label htmlFor="newPassword">Nueva Contraseña</label>
-                    <input 
-                      type="password" 
-                      id="newPassword"
-                      value={newPassword} 
-                      onChange={(e) => setNewPassword(e.target.value)} 
-                      required 
-                      autoFocus
-                    />
-                    <p className="input-help">La contraseña debe tener al menos 6 caracteres</p>
-                  </div>
-                  
-                  <div className="modal-footer">
-                    <button type="button" onClick={() => setShowPasswordModal(false)} className="btn-cancel">
-                      Cancelar
-                    </button>
-                    <button type="submit" className="btn-save" disabled={loading}>
-                      {loading ? 'Guardando...' : 'Guardar Nueva Contraseña'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Sistema de notificaciones */}
-        {notificacion.visible && (
-          <div className={`notification notification-${notificacion.tipo}`}>
-            <span className="notification-message">{notificacion.mensaje}</span>
+          
+          <div className="modal-footer">
             <button 
-              className="notification-close" 
-              onClick={() => setNotificacion(prev => ({ ...prev, visible: false }))}
+              type="submit" 
+              className="btn-primary" 
+              disabled={loading}
             >
-              <i className="fa fa-times"></i>
+              {loading ? 'Cambiando...' : 'Cambiar Contraseña'}
             </button>
           </div>
-        )}
+        </form>
       </div>
     </div>
   );
+};
+
+// Renderizado de componente principal
+return (
+  <div className="gestion-usuarios-container">
+    {/* Modal de cambio de contraseña obligatorio */}
+    {modalCambioClave && renderModalCambioClave()}
+
+    {/* Modal de restablecimiento de contraseña para usuarios existentes */}
+    {showPasswordModal && (
+      <div className="modal-overlay">
+        <div className="modal-container">
+          <div className="modal-header">
+            <h3>Restablecer Contraseña</h3>
+            <button 
+              className="close-button" 
+              onClick={() => setShowPasswordModal(false)}
+            >
+              &times;
+            </button>
+          </div>
+          
+          <div className="modal-body">
+            <p>¿Está seguro que desea restablecer la contraseña para {selectedUser?.nombres} {selectedUser?.apellidoPaterno}?</p>
+            <p>Se generará una nueva contraseña temporal y se requerirá cambio en el próximo inicio de sesión.</p>
+          </div>
+          
+          <div className="modal-footer">
+            <button 
+              className="btn-secondary" 
+              onClick={() => setShowPasswordModal(false)}
+            >
+              Cancelar
+            </button>
+            <button 
+              className="btn-primary" 
+              onClick={restablecerContrasena}
+              disabled={loading}
+            >
+              {loading ? 'Restableciendo...' : 'Restablecer Contraseña'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Encabezado de sección */}
+    <div className="section-header">
+      <h2>Panel de Gestión de Administradores</h2>
+      <div className="green-underline"></div>
+    </div>
+    
+    {/* Sección de formulario */}
+    <div className="usuarios-section">
+      <div className="form-card">
+        <h3>Registrar Nuevo Administrador</h3>
+        
+        <form onSubmit={handleSubmit} className="usuario-form">
+          <div className="form-grid">
+            <div className="form-group">
+              <label htmlFor="nombres">Nombres *</label>
+              <input 
+                type="text" 
+                id="nombres"
+                name="nombres" 
+                value={formData.nombres} 
+                onChange={handleInputChange} 
+                required 
+              />
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="apellidoPaterno">Apellido Paterno *</label>
+              <input 
+                type="text" 
+                id="apellidoPaterno"
+                name="apellidoPaterno" 
+                value={formData.apellidoPaterno} 
+                onChange={handleInputChange} 
+                required 
+              />
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="apellidoMaterno">Apellido Materno</label>
+              <input 
+                type="text" 
+                id="apellidoMaterno"
+                name="apellidoMaterno" 
+                value={formData.apellidoMaterno} 
+                onChange={handleInputChange} 
+              />
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="ci">Carnet de Identidad *</label>
+              <input 
+                type="text" 
+                id="ci"
+                name="ci" 
+                value={formData.ci} 
+                onChange={handleInputChange} 
+                pattern="\d{5,10}"
+                title="El carnet debe contener entre 5 y 10 dígitos"
+                required 
+              />
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="genero">Género *</label>
+              <select 
+                id="genero"
+                name="genero" 
+                value={formData.genero} 
+                onChange={handleInputChange}
+                required
+              >
+                <option value="masculino">Masculino</option>
+                <option value="femenino">Femenino</option>
+                <option value="otro">Otro</option>
+              </select>
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="celular">Celular *</label>
+              <input 
+                type="tel" 
+                id="celular"
+                name="celular" 
+                value={formData.celular} 
+                onChange={handleInputChange} 
+                pattern="\d{8}"
+                title="El número de celular debe contener 8 dígitos"
+                required 
+              />
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="role">Tipo de Administrador *</label>
+              <select 
+                id="role"
+                name="role" 
+                value={formData.role} 
+                onChange={handleInputChange}
+                required
+              >
+                <option value="receptionist">Recepcionista</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="form-info">
+            <p><small>* Campos obligatorios</small></p>
+            <p><small>El correo electrónico se generará automáticamente usando la primera letra del nombre, el apellido paterno completo y la primera letra del apellido materno.</small></p>
+            <p><small>La contraseña se generará automáticamente.</small></p>
+          </div>
+          
+          <div className="form-actions">
+            <button type="submit" className="btn-primary" disabled={loading}>
+              {loading ? 'Creando...' : 'Crear Nuevo Administrador'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    {/* Sección de lista de usuarios */}
+    <div className="usuarios-section">
+      <h3>Administradores Registrados en el Sistema</h3>
+      
+      <div className="search-bar">
+        <input
+          type="text"
+          placeholder="Buscar por nombre, apellido, correo o carnet"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="search-input"
+        />
+      </div>
+      
+      {loading && (
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p className="loading-message">Cargando usuarios...</p>
+        </div>
+      )}
+      
+      {!loading && filteredUsuarios.length === 0 && (
+        <div className="no-results">
+          <i className="fa fa-exclamation-circle"></i>
+          <p>No hay administradores que coincidan con la búsqueda.</p>
+        </div>
+      )}
+      
+      {!loading && filteredUsuarios.length > 0 && (
+        <div className="table-container">
+          <table className="usuarios-table">
+            <thead>
+              <tr>
+                <th>Nombre Completo</th>
+                <th>Correo Electrónico</th>
+                <th>Carnet</th>
+                <th>Celular</th>
+                <th>Tipo</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredUsuarios.map(user => (
+                <tr key={user.id} className={user.active ? 'row-active' : 'row-inactive'}>
+                  <td data-label="Nombre Completo">
+                    {`${user.nombres || ''} ${user.apellidoPaterno || ''} ${user.apellidoMaterno || ''}`}
+                  </td>
+                  <td data-label="Correo Electrónico">{user.email}</td>
+                  <td data-label="Carnet">{user.ci}</td>
+                  <td data-label="Celular">{user.celular}</td>
+                  <td data-label="Tipo">{traducirRol(user.role)}</td>
+                  <td data-label="Estado">
+                    <span className={`status-badge ${user.active ? 'active' : 'inactive'}`}>
+                      {user.active ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </td>
+                  <td data-label="Acciones">
+                    <div className="action-buttons">
+                      <button 
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setShowPasswordModal(true);
+                        }} 
+                        className="btn-table-action btn-password"
+                        title="Restablecer contraseña"
+                      >
+                        <i className="fa fa-key"></i>
+                        <span>Cambiar Contraseña</span>
+                      </button>
+                      <button 
+                        onClick={() => toggleAccountStatus(user.id, user.active)} 
+                        className={`btn-table-action ${user.active ? 'btn-deactivate' : 'btn-activate'}`}
+                        title={user.active ? 'Desactivar administrador' : 'Activar administrador'}
+                      >
+                        <i className={user.active ? "fa fa-toggle-on" : "fa fa-toggle-off"}></i>
+                        <span>{user.active ? 'Desactivar' : 'Activar'}</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      
+      {/* Modal para nuevo usuario */}
+      {showNewUserModal && nuevoUsuario && (
+        <div className="modal-overlay">
+          <div className="modal-container">
+            <div className="modal-header">
+              <h3>Nuevo Administrador Creado</h3>
+              <button 
+                className="close-button" 
+                onClick={() => setShowNewUserModal(false)}
+              >
+                &times;
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              <h4>Información del Administrador</h4>
+              <p><strong>Nombre completo:</strong> {`${nuevoUsuario.nombres} ${nuevoUsuario.apellidoPaterno} ${nuevoUsuario.apellidoMaterno}`}</p>
+              <p><strong>Tipo:</strong> {traducirRol(nuevoUsuario.role)}</p>
+              
+              <div className="credentials-box">
+                <h4>Credenciales de Acceso</h4>
+                <div className="credential-item">
+                  <span><strong>Correo electrónico:</strong> {nuevoUsuario.email}</span>
+                </div>
+                <div className="credential-item">
+                  <span><strong>Contraseña temporal:</strong> {nuevoUsuario.password}</span>
+                </div>
+              </div>
+              
+              <div className="warning-box">
+                <i className="fa fa-exclamation-triangle"></i>
+                <p><strong>ADVERTENCIA:</strong> GUARDE ESTAS CREDENCIALES DE ACCESO. EL USUARIO DEBERÁ CAMBIAR SU CONTRASEÑA EN EL PRIMER INICIO DE SESIÓN.</p>
+              </div>
+              
+              <div className="info-box">
+                <i className="fa fa-info-circle"></i>
+                <p>Por razones de seguridad, estas credenciales no podrán ser recuperadas una vez que cierre esta ventana.</p>
+              </div>
+            </div>
+            
+            <div className="modal-footer">
+              <button 
+                className="btn-copy-all" 
+                onClick={() => copiarAlPortapapeles(`Correo: ${nuevoUsuario.email}\nContraseña: ${nuevoUsuario.password}`)}
+              >
+                <i className="fa fa-copy"></i> Copiar Todas las Credenciales
+              </button>
+              <button 
+                className="btn-primary" 
+                onClick={() => setShowNewUserModal(false)}
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Sistema de notificaciones */}
+      {notificacion.visible && (
+        <div className={`notification notification-${notificacion.tipo}`}>
+          <span className="notification-message">{notificacion.mensaje}</span>
+          <button 
+            className="notification-close" 
+            onClick={() => setNotificacion(prev => ({ ...prev, visible: false }))}
+          >
+            <i className="fa fa-times"></i>
+          </button>
+        </div>
+      )}
+    </div>
+  </div>
+);
 };
 
 export default GestionUsuarios;

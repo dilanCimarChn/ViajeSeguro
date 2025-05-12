@@ -1,13 +1,13 @@
-// DashboardLayout.js
 import React from 'react';
-import BarraNavLateral from './barra-nav'; // Ajusta la ruta según tu estructura
-import './Layout.css';
+import BarraNavLateral from './barra-nav';
+import './layout.css';
 
-const DashboardLayout = ({ children }) => {
+// Componente Layout que incluye la barra lateral y el contenido
+const DashboardLayout = ({ children, handleLogout }) => {
   return (
     <div className="dashboard-layout">
-      <BarraNavLateral />
-      <div className="content">
+      <BarraNavLateral handleLogout={handleLogout} />
+      <div className="content-area">
         {children}
       </div>
     </div>
