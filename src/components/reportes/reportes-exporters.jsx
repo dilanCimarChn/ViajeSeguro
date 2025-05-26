@@ -24,15 +24,130 @@ const formatCurrency = (value) => {
   }).format(value);
 };
 
-// URL del logo para los reportes PDF
-const logoUrl = 'https://i.ibb.co/xtN8mjLv/logo.png';
+// Logo en Base64 (solución más confiable para producción)
+const logoBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='; // Placeholder, reemplaza con tu logo real
 
-// Función para exportar datos a CSV
+// Función alternativa para generar PDF sin recursos externos
+const generateSimplePDF = (dataToExport, columns, title, subtitle, fileName, extraInfo = '') => {
+  try {
+    const doc = new jsPDF({
+      orientation: dataToExport[0] && dataToExport[0].length > 6 ? 'landscape' : 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    // Configurar fuente
+    doc.setFont('helvetica');
+    
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+
+    // Cabecera simple sin logo externo
+    doc.setFontSize(20);
+    doc.setTextColor(0, 47, 108);
+    doc.text('VIAJE SEGURO', pageWidth / 2, margin + 5, { align: 'center' });
+    
+    doc.setFontSize(16);
+    doc.setTextColor(0, 47, 108);
+    doc.text(title, pageWidth / 2, margin + 15, { align: 'center' });
+    
+    doc.setFontSize(12);
+    doc.setTextColor(80, 80, 80);
+    doc.text(subtitle, pageWidth / 2, margin + 25, { align: 'center' });
+    
+    // Información de generación
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Generado: ${new Date().toLocaleString('es-ES')}`, pageWidth - margin, margin + 5, { align: 'right' });
+    
+    // Línea divisoria
+    doc.setDrawColor(0, 175, 135);
+    doc.setLineWidth(0.5);
+    doc.line(margin, margin + 30, pageWidth - margin, margin + 30);
+
+    // Configurar tabla
+    const tableOptions = {
+      head: [columns],
+      body: dataToExport,
+      startY: margin + 35,
+      margin: { left: margin, right: margin },
+      styles: { 
+        fontSize: 8, 
+        cellPadding: 2,
+        font: 'helvetica',
+        overflow: 'linebreak',
+        halign: 'left'
+      },
+      headStyles: { 
+        fillColor: [0, 175, 135],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 9
+      },
+      alternateRowStyles: {
+        fillColor: [248, 249, 250]
+      },
+      columnStyles: {
+        // Ajustar anchos según el número de columnas
+        ...Object.fromEntries(
+          columns.map((_, index) => [index, { cellWidth: 'auto' }])
+        )
+      },
+      didDrawPage: (data) => {
+        // Pie de página
+        const footerText = `© ${new Date().getFullYear()} Viaje Seguro - Página ${data.pageNumber}`;
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' });
+      }
+    };
+
+    // Agregar tabla
+    doc.autoTable(tableOptions);
+
+    // Agregar métricas si existen
+    if (extraInfo) {
+      const finalY = doc.lastAutoTable.finalY || margin + 40;
+      
+      if (finalY + 40 < pageHeight - margin) {
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.3);
+        doc.line(margin, finalY + 10, pageWidth - margin, finalY + 10);
+        
+        doc.setFontSize(12);
+        doc.setTextColor(0, 47, 108);
+        doc.text("Resumen Ejecutivo", margin, finalY + 20);
+        
+        doc.setFontSize(9);
+        doc.setTextColor(80, 80, 80);
+        
+        const lines = extraInfo.split('\n').filter(line => line.trim() !== '');
+        let yPos = finalY + 28;
+        
+        lines.forEach(line => {
+          if (yPos < pageHeight - 20) {
+            doc.text(line.trim(), margin, yPos);
+            yPos += 5;
+          }
+        });
+      }
+    }
+
+    // Descargar
+    doc.save(fileName);
+    return true;
+  } catch (error) {
+    console.error("Error al generar PDF simple:", error);
+    return false;
+  }
+};
+
+// Función para exportar datos a CSV (sin cambios)
 export const exportarCSV = (dataToExport, activeTab, fechaInicio, fechaFin, idioma) => {
   let fileName = '';
-  let delimiter = idioma === 'es' ? ';' : ','; // Usar punto y coma para español, coma para inglés
+  let delimiter = idioma === 'es' ? ';' : ',';
   
-  // Generar nombre de archivo según la categoría
   switch(activeTab) {
     case 'viajes':
       fileName = `viajes_${formatDateShort(fechaInicio).replace(/\//g, '-')}_a_${formatDateShort(fechaFin).replace(/\//g, '-')}.csv`;
@@ -57,7 +172,6 @@ export const exportarCSV = (dataToExport, activeTab, fechaInicio, fechaFin, idio
       return;
   }
 
-  // Preparar los datos para exportación según la categoría
   let dataPreparada = [];
   
   switch(activeTab) {
@@ -147,21 +261,17 @@ export const exportarCSV = (dataToExport, activeTab, fechaInicio, fechaFin, idio
       });
   }
   
-  // Configurar opciones del CSV basadas en el idioma
   const csvOptions = {
     delimiter: delimiter,
     header: true,
-    quotes: true,  // Para manejar caracteres especiales
+    quotes: true,
     quoteChar: '"',
     escapeChar: '"'
   };
 
   const csv = Papa.unparse(dataPreparada, csvOptions);
-  
-  // Agregar BOM para asegurar que los caracteres se muestren correctamente en Excel
   const csvContent = '\uFEFF' + csv;
   
-  // Crear Blob con el encoding correcto para caracteres especiales
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -172,109 +282,118 @@ export const exportarCSV = (dataToExport, activeTab, fechaInicio, fechaFin, idio
   document.body.removeChild(link);
 };
 
-// Función mejorada para exportar reportes a PDF
+// Función mejorada para exportar reportes a PDF (versión producción)
 export const exportarPDF = (dataToExport, activeTab, fechaInicio, fechaFin, metricas) => {
+  if (!dataToExport || dataToExport.length === 0) {
+    alert('No hay datos para exportar');
+    return;
+  }
+
   let columns = [];
   let title = '';
   let subtitle = '';
   let fileName = '';
   let extraInfo = '';
+  let processedData = [];
 
   // Configurar datos según tipo de reporte
   switch(activeTab) {
     case 'viajes':
-      dataToExport = dataToExport.map(v => [
-        v.fecha, 
-        v.origen.length > 15 ? v.origen.substring(0, 15) + '...' : v.origen, 
-        v.destino.length > 15 ? v.destino.substring(0, 15) + '...' : v.destino, 
-        v.estado, 
-        v.conductor, 
-        v.cliente, 
-        `${formatCurrency(v.precio)}`, 
-        `${v.distancia.toFixed(1)} km`, 
-        `${v.duracion} min`, 
-        v.calificacion
+      processedData = dataToExport.map(v => [
+        v.fecha || '', 
+        (v.origen || '').length > 15 ? (v.origen || '').substring(0, 15) + '...' : (v.origen || ''), 
+        (v.destino || '').length > 15 ? (v.destino || '').substring(0, 15) + '...' : (v.destino || ''), 
+        v.estado || '', 
+        v.conductor || '', 
+        v.cliente || '', 
+        formatCurrency(v.precio || 0), 
+        `${(v.distancia || 0).toFixed(1)} km`, 
+        `${v.duracion || 0} min`, 
+        v.calificacion || 0
       ]);
       columns = ['Fecha', 'Origen', 'Destino', 'Estado', 'Conductor', 'Cliente', 'Precio', 'Distancia', 'Duración', 'Cal.'];
-      title = `Reporte de Viajes`;
+      title = 'Reporte de Viajes';
       subtitle = `Período: ${formatDateShort(fechaInicio)} - ${formatDateShort(fechaFin)}`;
       fileName = `Viajes_${formatDateShort(fechaInicio).replace(/\//g, '-')}_a_${formatDateShort(fechaFin).replace(/\//g, '-')}.pdf`;
       
-     // Añadir métricas para viajes
-      extraInfo = `
-        Métricas del Período:
-        - Ganancia Total: ${formatCurrency(metricas.viajes.gananciaTotal)}
-        - Viajes Completados: ${metricas.viajes.viajesCompletados}
-        - Viajes Cancelados: ${metricas.viajes.viajesCancelados}
-        - Distancia Total: ${metricas.viajes.distanciaTotal.toFixed(1)} km
-        - Distancia Promedio: ${metricas.viajes.distanciaPromedio.toFixed(1)} km
-        - Tarifa Promedio: ${formatCurrency(metricas.viajes.tarifaPromedio)}
-      `;
+      if (metricas && metricas.viajes) {
+        extraInfo = `
+          Métricas del Período:
+          - Ganancia Total: ${formatCurrency(metricas.viajes.gananciaTotal || 0)}
+          - Viajes Completados: ${metricas.viajes.viajesCompletados || 0}
+          - Viajes Cancelados: ${metricas.viajes.viajesCancelados || 0}
+          - Distancia Total: ${(metricas.viajes.distanciaTotal || 0).toFixed(1)} km
+          - Distancia Promedio: ${(metricas.viajes.distanciaPromedio || 0).toFixed(1)} km
+          - Tarifa Promedio: ${formatCurrency(metricas.viajes.tarifaPromedio || 0)}
+        `;
+      }
       break;
       
     case 'conductores':
-      dataToExport = dataToExport.map(c => [
-        c.nombre, 
-        c.email, 
-        c.telefono, 
-        c.licencia, 
-        c.fechaRegistro, 
-        c.estado, 
-        c.viajesRealizados, 
-        c.calificacionPromedio.toFixed(1),
-        c.modelo_vehiculo,
-        c.placa_vehiculo
+      processedData = dataToExport.map(c => [
+        c.nombre || '', 
+        c.email || '', 
+        c.telefono || '', 
+        c.licencia || '', 
+        c.fechaRegistro || '', 
+        c.estado || '', 
+        c.viajesRealizados || 0, 
+        (c.calificacionPromedio || 0).toFixed(1),
+        c.modelo_vehiculo || '',
+        c.placa_vehiculo || ''
       ]);
       columns = ['Nombre', 'Email', 'Teléfono', 'Licencia', 'Registro', 'Estado', 'Viajes', 'Cal.', 'Modelo', 'Placa'];
       title = 'Reporte de Conductores';
       subtitle = `Generado: ${formatDateShort(new Date())}`;
       fileName = `Conductores_${formatDateShort(new Date()).replace(/\//g, '-')}.pdf`;
       
-      // Métricas para conductores
-      extraInfo = `
-        Métricas de Conductores:
-        - Conductores Activos: ${metricas.conductores.activos}
-        - Conductores Inactivos: ${metricas.conductores.inactivos}
-        - Total de Viajes Realizados: ${metricas.conductores.totalViajes}
-        - Calificación Promedio: ${metricas.conductores.calificacionPromedio.toFixed(1)}
-      `;
+      if (metricas && metricas.conductores) {
+        extraInfo = `
+          Métricas de Conductores:
+          - Conductores Activos: ${metricas.conductores.activos || 0}
+          - Conductores Inactivos: ${metricas.conductores.inactivos || 0}
+          - Total de Viajes Realizados: ${metricas.conductores.totalViajes || 0}
+          - Calificación Promedio: ${(metricas.conductores.calificacionPromedio || 0).toFixed(1)}
+        `;
+      }
       break;
       
     case 'solicitudes':
-      dataToExport = dataToExport.map(s => [
-        s.nombre, 
-        s.email, 
-        s.telefono, 
-        s.licencia, 
-        s.fechaSolicitud, 
-        s.estado, 
+      processedData = dataToExport.map(s => [
+        s.nombre || '', 
+        s.email || '', 
+        s.telefono || '', 
+        s.licencia || '', 
+        s.fechaSolicitud || '', 
+        s.estado || '', 
         s.documentosCompletos ? 'Sí' : 'No',
         s.fecha_aprobacion || 'N/A',
-        s.modelo_vehiculo
+        s.modelo_vehiculo || ''
       ]);
       columns = ['Nombre', 'Email', 'Teléfono', 'Licencia', 'Fecha Solicitud', 'Estado', 'Docs.', 'Aprobación', 'Vehículo'];
       title = 'Reporte de Solicitudes';
       subtitle = `Generado: ${formatDateShort(new Date())}`;
       fileName = `Solicitudes_${formatDateShort(new Date()).replace(/\//g, '-')}.pdf`;
       
-      // Métricas para solicitudes
-      extraInfo = `
-        Métricas de Solicitudes:
-        - Pendientes: ${metricas.solicitudes.pendientes}
-        - Aprobadas: ${metricas.solicitudes.aprobadas}
-        - Rechazadas: ${metricas.solicitudes.rechazadas}
-        - Tiempo Promedio de Aprobación: ${metricas.solicitudes.tiempoPromedioAprobacion.toFixed(1)} horas
-      `;
+      if (metricas && metricas.solicitudes) {
+        extraInfo = `
+          Métricas de Solicitudes:
+          - Pendientes: ${metricas.solicitudes.pendientes || 0}
+          - Aprobadas: ${metricas.solicitudes.aprobadas || 0}
+          - Rechazadas: ${metricas.solicitudes.rechazadas || 0}
+          - Tiempo Promedio de Aprobación: ${(metricas.solicitudes.tiempoPromedioAprobacion || 0).toFixed(1)} horas
+        `;
+      }
       break;
       
     case 'admins':
-      dataToExport = dataToExport.map(a => [
-        a.nombre, 
-        a.email, 
-        a.rol, 
-        a.fechaRegistro, 
-        a.ultimoAcceso, 
-        a.accionesRealizadas,
+      processedData = dataToExport.map(a => [
+        a.nombre || '', 
+        a.email || '', 
+        a.rol || '', 
+        a.fechaRegistro || '', 
+        a.ultimoAcceso || '', 
+        a.accionesRealizadas || 0,
         a.active ? 'Activo' : 'Inactivo'
       ]);
       columns = ['Nombre', 'Email', 'Rol', 'Registro', 'Último Acceso', 'Acciones', 'Estado'];
@@ -284,14 +403,14 @@ export const exportarPDF = (dataToExport, activeTab, fechaInicio, fechaFin, metr
       break;
       
     case 'grabaciones':
-      dataToExport = dataToExport.map(g => [
-        g.viajeId, 
-        g.conductorId, 
-        g.fecha, 
-        g.duracion, 
-        g.tamaño, 
-        g.estado, 
-        g.visualizaciones
+      processedData = dataToExport.map(g => [
+        g.viajeId || '', 
+        g.conductorId || '', 
+        g.fecha || '', 
+        g.duracion || '', 
+        g.tamaño || '', 
+        g.estado || '', 
+        g.visualizaciones || 0
       ]);
       columns = ['ID Viaje', 'ID Conductor', 'Fecha', 'Duración', 'Tamaño', 'Estado', 'Vistas'];
       title = 'Reporte de Grabaciones';
@@ -300,13 +419,13 @@ export const exportarPDF = (dataToExport, activeTab, fechaInicio, fechaFin, metr
       break;
       
     case 'logs':
-      dataToExport = dataToExport.map(l => [
-        l.fecha, 
-        l.usuario,
-        l.accion, 
-        l.detalles.length > 25 ? l.detalles.substring(0, 25) + '...' : l.detalles, 
-        l.modulo, 
-        l.resultado
+      processedData = dataToExport.map(l => [
+        l.fecha || '', 
+        l.usuario || '',
+        l.accion || '', 
+        (l.detalles || '').length > 25 ? (l.detalles || '').substring(0, 25) + '...' : (l.detalles || ''), 
+        l.modulo || '', 
+        l.resultado || ''
       ]);
       columns = ['Fecha', 'Usuario', 'Acción', 'Detalles', 'Módulo', 'Resultado'];
       title = 'Reporte de Logs del Sistema';
@@ -315,166 +434,14 @@ export const exportarPDF = (dataToExport, activeTab, fechaInicio, fechaFin, metr
       break;
       
     default:
-      alert('No hay datos para exportar');
+      alert('Tipo de reporte no válido');
       return;
   }
+
+  // Intentar generar PDF simple (más confiable en producción)
+  const success = generateSimplePDF(processedData, columns, title, subtitle, fileName, extraInfo);
   
-  try {
-    // Crear PDF con soporte para caracteres acentuados
-    const doc = new jsPDF({
-      orientation: activeTab === 'viajes' ? 'landscape' : (dataToExport[0] && dataToExport[0].length > 5 ? 'landscape' : 'portrait'),
-      unit: 'mm',
-      format: 'a4'
-    });
-    
-    // Añadir la fuente Helvetica que soporta caracteres especiales
-    doc.setFont('helvetica');
-    
-    // Definir dimensiones y márgenes
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 15;
-    
-    // Cargar imagen del logo y agregarla
-    const logoWidth = 40;
-    const logoHeight = 20;
-    
-    // Agregar logo empresarial en esquina superior izquierda
-    try {
-      doc.addImage(logoUrl, 'PNG', margin, margin, logoWidth, logoHeight);
-    } catch (error) {
-      console.error("Error al cargar el logo:", error);
-      // Si falla la carga del logo, continuar sin él
-    }
-    
-    // Información de cabecera
-    // Título principal
-    doc.setFontSize(18);
-    doc.setTextColor(0, 47, 108); // Azul corporativo oscuro
-    doc.text(title, pageWidth / 2, margin + 10, { align: 'center' });
-    
-    // Subtítulo (período o fecha de generación)
-    doc.setFontSize(12);
-    doc.setTextColor(80, 80, 80); // Gris oscuro
-    doc.text(subtitle, pageWidth / 2, margin + 20, { align: 'center' });
-    
-    // Información de la empresa
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100); // Gris medio
-    doc.text('Viaje Seguro - Sistema de Reportes', pageWidth - margin, margin + 5, { align: 'right' });
-    doc.text(`Fecha de emisión: ${new Date().toLocaleString()}`, pageWidth - margin, margin + 10, { align: 'right' });
-    
-    // Línea divisoria
-    doc.setDrawColor(0, 175, 135); // Verde corporativo
-    doc.setLineWidth(0.5);
-    doc.line(margin, margin + 25, pageWidth - margin, margin + 25);
-    
-    // Configurar opciones específicas para AutoTable
-    const tableOptions = {
-      head: [columns],
-      body: dataToExport,
-      startY: margin + 30,
-      margin: { left: margin, right: margin },
-      styles: { 
-        fontSize: 8, 
-        cellPadding: 3,
-        font: 'helvetica', // Asegurar que se use la fuente correcta
-        overflow: 'linebreak'
-      },
-      headStyles: { 
-        fillColor: [0, 175, 135], // Verde corporativo
-        textColor: [255, 255, 255],
-        fontStyle: 'bold'
-      },
-      alternateRowStyles: {
-        fillColor: [245, 245, 245] // Gris muy claro para filas alternas
-      },
-      // Estas opciones mejoran la apariencia y el manejo de caracteres especiales
-      didDrawPage: (data) => {
-        // Agregar pie de página
-        const footerText = `© ${new Date().getFullYear()} Viaje Seguro - Página ${data.pageNumber} de ${data.pageCount}`;
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' });
-      }
-    };
-    
-    // Añadir tabla al PDF
-    doc.autoTable(tableOptions);
-     
-    // Si hay muchos datos, agregar resumen estadístico al final
-    if (dataToExport.length > 0) {
-      const finalY = doc.lastAutoTable.finalY || margin + 35;
-      
-      if (finalY + 50 < pageHeight - margin && extraInfo) {
-        // Agregar línea divisoria
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.3);
-        doc.line(margin, finalY + 10, pageWidth - margin, finalY + 10);
-        
-        // Agregar resumen según tipo de reporte
-        doc.setFontSize(11);
-        doc.setTextColor(0, 47, 108);
-        doc.text("Resumen del reporte", margin, finalY + 20);
-        
-        // Agregar métricas de negocio
-        doc.setFontSize(9);
-        doc.setTextColor(80, 80, 80);
-        
-        // Formatear y agregar extraInfo separando cada línea
-        const extraInfoLines = extraInfo.split('\n').filter(line => line.trim() !== '');
-        let yPos = finalY + 30;
-        
-        extraInfoLines.forEach(line => {
-          doc.text(line.trim(), margin, yPos);
-          yPos += 5;
-        });
-        
-        // Agregar información específica según el tipo de reporte
-        switch(activeTab) {
-          case 'viajes':
-            // Desglose de ganancias si hay más de 2 días con datos
-            if (metricas.viajes.gananciaDiaria && Object.keys(metricas.viajes.gananciaDiaria).length > 2) {
-              yPos += 5;
-              doc.text('Desglose de Ganancias por Día (Top 5):', margin, yPos);
-              yPos += 5;
-              
-              Object.entries(metricas.viajes.gananciaDiaria)
-                .sort((a, b) => b[1] - a[1]) // Ordenar por ganancia (mayor a menor)
-                .slice(0, 5) // Tomar los 5 mejores días
-                .forEach(([fecha, ganancia]) => {
-                  doc.text(`${fecha}: ${formatCurrency(ganancia)}`, margin + 5, yPos);
-                  yPos += 5;
-                });
-            }
-            break;
-            
-          case 'conductores':
-            // Top conductores por calificación
-            const conductoresTop = [...dataToExport]
-              .filter(c => parseFloat(c[7]) > 0) // Filtrar por calificación > 0
-              .sort((a, b) => parseFloat(b[7]) - parseFloat(a[7])) // Ordenar por calificación
-              .slice(0, 3);
-              
-            if (conductoresTop.length > 0) {
-              yPos += 5;
-              doc.text('Top Conductores por Calificación:', margin, yPos);
-              yPos += 5;
-              
-              conductoresTop.forEach((c, index) => {
-                doc.text(`${index + 1}. ${c[0]}: ${c[7]} ★ (${c[6]} viajes)`, margin + 5, yPos);
-                yPos += 5;
-              });
-            }
-            break;
-        }
-      }
-    }
-    
-    // Guardar PDF
-    doc.save(fileName);
-  } catch (error) {
-    console.error("Error al generar PDF:", error);
-    alert("Error al generar el PDF. Intente nuevamente.");
+  if (!success) {
+    alert('Error al generar el PDF. Por favor, intente nuevamente o contacte al administrador.');
   }
 };
