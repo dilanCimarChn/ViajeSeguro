@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { 
@@ -40,8 +40,31 @@ const VistaViajesTiempoReal = () => {
   const [error, setError] = useState(null);
   const [creandoDatos, setCreandoDatos] = useState(false);
   
+  // Memoizar posición del centro del mapa
+  const centroMapa = useMemo(() => [-16.505, -68.130], []);
+  
+  // Función para formatear fecha - memoizada
+  const formatDate = useCallback((timestamp) => {
+    if (!timestamp) return 'Sin fecha';
+    
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      
+      return date.toLocaleString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error("Error al formatear fecha:", error);
+      return 'Fecha inválida';
+    }
+  }, []);
+
   // Función para crear datos de prueba
-  const crearDatosPrueba = async () => {
+  const crearDatosPrueba = useCallback(async () => {
     try {
       setCreandoDatos(true);
       
@@ -116,18 +139,6 @@ const VistaViajesTiempoReal = () => {
         tarifa: 18
       });
       
-      await addDoc(collection(db, 'viajes'), {
-        conductor_id: dilanRef.id,
-        destino: "Hospital General",
-        origen: "Este",
-        estado: "cancelado",
-        fecha_inicio: Timestamp.fromDate(new Date(Date.now() - 2*24*60*60*1000)),
-        fecha_actualizacion: Timestamp.now(),
-        tiempo_estimado: 0,
-        pasajero: "Laura Sánchez",
-        tarifa: 35
-      });
-      
       // Crear posiciones
       await addDoc(collection(db, 'posiciones_conductores'), {
         conductor_id: dilanRef.id,
@@ -156,49 +167,19 @@ const VistaViajesTiempoReal = () => {
         timestamp: Timestamp.now()
       });
       
-      // Crear datos históricos para la gráfica
-      const hoy = new Date();
-      for (let i = 6; i >= 0; i--) {
-        const fecha = new Date(hoy);
-        fecha.setDate(hoy.getDate() - i);
-        
-        // Crear entre 5 y 15 viajes aleatorios por día
-        const numViajes = Math.floor(Math.random() * 10) + 5;
-        
-        for (let j = 0; j < numViajes; j++) {
-          const conductorId = [dilanRef.id, anaRef.id, carlosRef.id][Math.floor(Math.random() * 3)];
-          const estados = ['completado', 'cancelado'];
-          const estado = estados[Math.floor(Math.random() * estados.length)];
-          
-          // Hora aleatoria dentro del día
-          const horaAleatoria = new Date(fecha);
-          horaAleatoria.setHours(Math.floor(Math.random() * 24), Math.floor(Math.random() * 60));
-          
-          await addDoc(collection(db, 'viajes'), {
-            conductor_id: conductorId,
-            destino: ["Centro Comercial", "Aeropuerto", "Universidad", "Hospital", "Parque"][Math.floor(Math.random() * 5)],
-            origen: ["Zona Sur", "Zona Norte", "Centro", "Este", "Oeste"][Math.floor(Math.random() * 5)],
-            estado: estado,
-            fecha_inicio: Timestamp.fromDate(horaAleatoria),
-            fecha_actualizacion: Timestamp.fromDate(horaAleatoria),
-            tiempo_estimado: 0,
-            pasajero: "Cliente " + j,
-            tarifa: Math.floor(Math.random() * 40) + 10
-          });
-        }
-      }
-      
       alert("Datos de prueba creados exitosamente");
-      setCreandoDatos(false);
     } catch (error) {
       console.error("Error al crear datos de prueba:", error);
       alert("Error al crear datos de prueba: " + error.message);
+    } finally {
       setCreandoDatos(false);
     }
-  };
+  }, []);
   
-  // Cargar conductores
+  // Cargar conductores - solo una vez al montar
   useEffect(() => {
+    let isMounted = true;
+    
     const cargarConductores = async () => {
       try {
         const conductoresQuery = query(
@@ -208,53 +189,68 @@ const VistaViajesTiempoReal = () => {
         );
         
         const conductoresSnapshot = await getDocs(conductoresQuery);
-        const conductoresData = conductoresSnapshot.docs.map(doc => ({
-          id: doc.id,
-          nombre: doc.data().nombre || 'Sin nombre',
-          telefono: doc.data().telefono || '',
-          email: doc.data().email || ''
-        }));
         
-        setConductores(conductoresData);
+        if (isMounted) {
+          const conductoresData = conductoresSnapshot.docs.map(doc => ({
+            id: doc.id,
+            nombre: doc.data().nombre || 'Sin nombre',
+            telefono: doc.data().telefono || '',
+            email: doc.data().email || ''
+          }));
+          
+          setConductores(conductoresData);
+        }
       } catch (error) {
         console.error("Error al cargar conductores:", error);
-        // Datos de ejemplo si falla
-        setConductores([
-          { id: 'C1', nombre: 'Dilan Cimar', telefono: '123654', email: 'flaquito@gmail.com' },
-          { id: 'C2', nombre: 'Ana Martínez', telefono: '987654', email: 'ana@example.com' },
-          { id: 'C3', nombre: 'Carlos López', telefono: '456789', email: 'carlos@example.com' }
-        ]);
+        
+        if (isMounted) {
+          // Datos de ejemplo si falla
+          setConductores([
+            { id: 'C1', nombre: 'Dilan Cimar', telefono: '123654', email: 'flaquito@gmail.com' },
+            { id: 'C2', nombre: 'Ana Martínez', telefono: '987654', email: 'ana@example.com' },
+            { id: 'C3', nombre: 'Carlos López', telefono: '456789', email: 'carlos@example.com' }
+          ]);
+        }
       }
     };
     
     cargarConductores();
-  }, []);
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Solo se ejecuta una vez
   
-  // Escuchar viajes en tiempo real
+  // Cargar viajes - se ejecuta cuando cambian los filtros o conductores
   useEffect(() => {
+    if (conductores.length === 0) {
+      return; // No hacer nada hasta que se carguen los conductores
+    }
+
+    let unsubscribe;
+    
     const cargarViajes = async () => {
       setLoading(true);
       setError(null);
       
       try {
-        // Consulta base
-        let viajesQuery = query(
-          collection(db, 'viajes'),
-          orderBy('fecha_inicio', 'desc')
-        );
+        // Construir consulta
+        const constraints = [orderBy('fecha_inicio', 'desc')];
         
-        // Aplicar filtro de estado
+        // Aplicar filtro de estado si no es 'todos'
         if (filtroEstado !== 'todos') {
-          viajesQuery = query(viajesQuery, where('estado', '==', filtroEstado));
+          constraints.unshift(where('estado', '==', filtroEstado));
         }
         
-        // Aplicar filtro de conductor
+        // Aplicar filtro de conductor si está seleccionado
         if (filtroConductor) {
-          viajesQuery = query(viajesQuery, where('conductor_id', '==', filtroConductor));
+          constraints.unshift(where('conductor_id', '==', filtroConductor));
         }
+        
+        const viajesQuery = query(collection(db, 'viajes'), ...constraints);
         
         // Suscripción en tiempo real a viajes
-        const unsubscribe = onSnapshot(viajesQuery, (querySnapshot) => {
+        unsubscribe = onSnapshot(viajesQuery, (querySnapshot) => {
           const viajesData = [];
           
           querySnapshot.forEach((doc) => {
@@ -269,7 +265,7 @@ const VistaViajesTiempoReal = () => {
               destino: data.destino || 'Sin destino',
               origen: data.origen || 'Sin origen',
               estado: data.estado || 'pendiente',
-              fecha: data.fecha_inicio ? formatDate(data.fecha_inicio) : 'Sin fecha',
+              fecha: formatDate(data.fecha_inicio),
               tiempoEstimado: data.tiempo_estimado || 0,
               pasajero: data.pasajero || 'Sin pasajero',
               tarifa: data.tarifa || 0
@@ -291,7 +287,6 @@ const VistaViajesTiempoReal = () => {
           ]);
         });
         
-        return () => unsubscribe();
       } catch (error) {
         console.error("Error al configurar la consulta de viajes:", error);
         setError("Error al configurar la consulta: " + error.message);
@@ -300,19 +295,30 @@ const VistaViajesTiempoReal = () => {
     };
     
     cargarViajes();
-  }, [filtroEstado, filtroConductor, conductores]);
+    
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [filtroEstado, filtroConductor, conductores, formatDate]);
   
-  // Cargar posiciones en tiempo real
+  // Cargar posiciones - depende solo de conductores
   useEffect(() => {
+    if (conductores.length === 0) {
+      return; // No hacer nada hasta que se carguen los conductores
+    }
+
+    let unsubscribe;
+    
     const cargarPosiciones = async () => {
       try {
-        // Consulta para posiciones en tiempo real
         const posicionesQuery = query(
           collection(db, 'posiciones_conductores'),
           orderBy('timestamp', 'desc')
         );
         
-        const unsubscribe = onSnapshot(posicionesQuery, (querySnapshot) => {
+        unsubscribe = onSnapshot(posicionesQuery, (querySnapshot) => {
           const posicionesData = [];
           const conductoresIds = new Set(); // Para evitar duplicados
           
@@ -352,7 +358,6 @@ const VistaViajesTiempoReal = () => {
           ]);
         });
         
-        return () => unsubscribe();
       } catch (error) {
         console.error("Error al configurar la consulta de posiciones:", error);
         
@@ -366,9 +371,15 @@ const VistaViajesTiempoReal = () => {
     };
     
     cargarPosiciones();
+    
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, [conductores]);
   
-  // Cargar estadísticas
+  // Cargar estadísticas - solo una vez y luego cada 10 minutos
   useEffect(() => {
     const cargarEstadisticas = async () => {
       try {
@@ -452,56 +463,41 @@ const VistaViajesTiempoReal = () => {
     return () => clearInterval(intervalId);
   }, []);
   
-  // Formatear fecha
-  const formatDate = (timestamp) => {
-    if (!timestamp) return 'Sin fecha';
-    
-    try {
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  // Memoizar viajes filtrados
+  const viajesFiltrados = useMemo(() => {
+    return viajes.filter(viaje => {
+      if (filtroEstado !== 'todos' && viaje.estado !== filtroEstado) {
+        return false;
+      }
       
-      return date.toLocaleString('es-ES', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      console.error("Error al formatear fecha:", error);
-      return 'Fecha inválida';
-    }
-  };
-  
-  // Filtrar viajes según el estado seleccionado
-  const viajesFiltrados = viajes.filter(viaje => {
-    if (filtroEstado !== 'todos' && viaje.estado !== filtroEstado) {
-      return false;
-    }
-    
-    if (filtroConductor && viaje.conductorId !== filtroConductor) {
-      return false;
-    }
-    
-    return true;
-  });
+      if (filtroConductor && viaje.conductorId !== filtroConductor) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [viajes, filtroEstado, filtroConductor]);
   
   // Cambiar estado de un viaje
-  const cambiarEstadoViaje = async (id, nuevoEstado) => {
+  const cambiarEstadoViaje = useCallback(async (id, nuevoEstado) => {
     try {
       await updateDoc(doc(db, 'viajes', id), {
         estado: nuevoEstado,
         fecha_actualizacion: Timestamp.now()
       });
-      
-      // No necesitamos actualizar el estado local porque onSnapshot lo hará automáticamente
     } catch (error) {
       console.error("Error al actualizar estado del viaje:", error);
       setError("Error al actualizar el viaje: " + error.message);
     }
-  };
+  }, []);
   
   // Simular un nuevo viaje para pruebas
-  const agregarNuevoViaje = async () => {
+  const agregarNuevoViaje = useCallback(async () => {
+    if (conductores.length === 0) {
+      alert("No hay conductores disponibles");
+      return;
+    }
+
     setLoading(true);
     
     try {
@@ -529,13 +525,23 @@ const VistaViajesTiempoReal = () => {
       
       await addDoc(collection(db, 'viajes'), nuevoViaje);
       
-      setLoading(false);
     } catch (error) {
       console.error("Error al crear nuevo viaje:", error);
       setError("Error al crear nuevo viaje: " + error.message);
+    } finally {
       setLoading(false);
     }
-  };
+  }, [conductores]);
+
+  // Estadísticas memoizadas
+  const estadisticasResumen = useMemo(() => {
+    return {
+      viajesActivos: viajes.filter(v => v.estado === 'en_curso').length,
+      viajesPendientes: viajes.filter(v => v.estado === 'pendiente').length,
+      viajesHoy: viajes.length,
+      conductoresOnline: posiciones.filter(p => p.disponible).length
+    };
+  }, [viajes, posiciones]);
   
   return (
     <div className="viajes-container">
@@ -572,12 +578,33 @@ const VistaViajesTiempoReal = () => {
           </select>
         </div>
         
+        <div className="acciones">
+          <button 
+            onClick={agregarNuevoViaje} 
+            className="btn-nuevo-viaje"
+            disabled={loading || conductores.length === 0}
+          >
+            Simular Nuevo Viaje
+          </button>
+          <button 
+            onClick={crearDatosPrueba} 
+            className="btn-datos-prueba"
+            disabled={creandoDatos}
+          >
+            {creandoDatos ? 'Creando...' : 'Crear Datos de Prueba'}
+          </button>
+        </div>
       </div>
       
       {/* Mapa de posiciones */}
       <div className="map-section">
         <h3>Ubicación de Conductores</h3>
-        <MapContainer center={[-16.505, -68.130]} zoom={13} className="map">
+        <MapContainer 
+          center={centroMapa} 
+          zoom={13} 
+          className="map"
+          key="mapa-conductores" // Key estática para evitar re-renders
+        >
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           {posiciones.map((pos) => (
             <Marker 
@@ -683,19 +710,19 @@ const VistaViajesTiempoReal = () => {
       <div className="resumen-estadistico">
         <div className="stat-card">
           <div className="stat-title">Viajes Activos</div>
-          <div className="stat-value">{viajes.filter(v => v.estado === 'en_curso').length}</div>
+          <div className="stat-value">{estadisticasResumen.viajesActivos}</div>
         </div>
         <div className="stat-card">
           <div className="stat-title">Viajes Pendientes</div>
-          <div className="stat-value">{viajes.filter(v => v.estado === 'pendiente').length}</div>
+          <div className="stat-value">{estadisticasResumen.viajesPendientes}</div>
         </div>
         <div className="stat-card">
           <div className="stat-title">Viajes Hoy</div>
-          <div className="stat-value">{viajes.length}</div>
+          <div className="stat-value">{estadisticasResumen.viajesHoy}</div>
         </div>
         <div className="stat-card">
           <div className="stat-title">Conductores Online</div>
-          <div className="stat-value">{posiciones.filter(p => p.disponible).length}</div>
+          <div className="stat-value">{estadisticasResumen.conductoresOnline}</div>
         </div>
       </div>
     </div>

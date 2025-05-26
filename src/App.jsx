@@ -53,43 +53,165 @@ function App() {
     }
   };
 
+  // Función helper para verificar permisos
+  const hasPermission = (route) => {
+    if (!userRole) return false;
+    
+    const adminRoutes = [
+      '/gestion-usuarios', '/gestion-clientes', '/gestion-conductores',
+      '/solicitudes-conductores', '/perfil-cliente', '/viajes-tiempo-real',
+      '/grabaciones-camara', '/reportes', '/configuracion'
+    ];
+    
+    const receptionistRoutes = [
+      '/gestion-clientes', '/gestion-conductores', '/solicitudes-conductores',
+      '/grabaciones-camara', '/configuracion'
+    ];
+    
+    if (userRole === 'admin') {
+      return adminRoutes.includes(route);
+    }
+    
+    if (userRole === 'receptionist') {
+      return receptionistRoutes.includes(route);
+    }
+    
+    return false;
+  };
+
+  // Componente para rutas protegidas
+  const ProtectedRoute = ({ children, path }) => {
+    if (!userRole) {
+      return <Navigate to="/login" replace />;
+    }
+    
+    if (!hasPermission(path)) {
+      return <Navigate to="/login" replace />;
+    }
+    
+    return (
+      <DashboardLayout handleLogout={handleLogout}>
+        {children}
+      </DashboardLayout>
+    );
+  };
+
   if (loading) {
-    return <div>Cargando...</div>;
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        fontSize: '18px'
+      }}>
+        Cargando...
+      </div>
+    );
   }
 
   return (
     <Router>
       <Routes>
-        {/* Rutas públicas */}
-        <Route path="/login" element={<RegLogin setUserRole={setUserRole} />} />
+        {/* Ruta pública */}
+        <Route 
+          path="/login" 
+          element={<RegLogin setUserRole={setUserRole} />} 
+        />
 
-        {/* Rutas protegidas según el rol */}
-        {userRole === 'admin' && (
-          <>
-            <Route path="/gestion-usuarios" element={<DashboardLayout handleLogout={handleLogout}><GestionUsuarios /></DashboardLayout>} />
-            <Route path="/gestion-clientes" element={<DashboardLayout handleLogout={handleLogout}><VistaGestionClientes /></DashboardLayout>} />
-            <Route path="/gestion-conductores" element={<DashboardLayout handleLogout={handleLogout}><GestionConductores /></DashboardLayout>} />
-            <Route path="/solicitudes-conductores" element={<DashboardLayout handleLogout={handleLogout}><VistaSolicitudesConductores /></DashboardLayout>} />
-            <Route path="/perfil-cliente" element={<DashboardLayout handleLogout={handleLogout}><VistaPerfilCliente /></DashboardLayout>} />
-            <Route path="/viajes-tiempo-real" element={<DashboardLayout handleLogout={handleLogout}><VistaViajesTiempoReal /></DashboardLayout>} />
-            <Route path="/grabaciones-camara" element={<DashboardLayout handleLogout={handleLogout}><GrabacionesCamara /></DashboardLayout>} />
-            <Route path="/reportes" element={<DashboardLayout handleLogout={handleLogout}><Reportes /></DashboardLayout>} />
-            <Route path="/configuracion" element={<DashboardLayout handleLogout={handleLogout}><VistaConfiguracion /></DashboardLayout>} />
-          </>
-        )}
+        {/* Rutas protegidas para Admin */}
+        <Route 
+          path="/gestion-usuarios" 
+          element={
+            <ProtectedRoute path="/gestion-usuarios">
+              <GestionUsuarios />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/gestion-clientes" 
+          element={
+            <ProtectedRoute path="/gestion-clientes">
+              <VistaGestionClientes />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/gestion-conductores" 
+          element={
+            <ProtectedRoute path="/gestion-conductores">
+              <GestionConductores />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/solicitudes-conductores" 
+          element={
+            <ProtectedRoute path="/solicitudes-conductores">
+              <VistaSolicitudesConductores />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/perfil-cliente" 
+          element={
+            <ProtectedRoute path="/perfil-cliente">
+              <VistaPerfilCliente />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/viajes-tiempo-real" 
+          element={
+            <ProtectedRoute path="/viajes-tiempo-real">
+              <VistaViajesTiempoReal />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/grabaciones-camara" 
+          element={
+            <ProtectedRoute path="/grabaciones-camara">
+              <GrabacionesCamara />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/reportes" 
+          element={
+            <ProtectedRoute path="/reportes">
+              <Reportes />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/configuracion" 
+          element={
+            <ProtectedRoute path="/configuracion">
+              <VistaConfiguracion />
+            </ProtectedRoute>
+          } 
+        />
 
-        {userRole === 'receptionist' && (
-          <>
-            <Route path="/gestion-clientes" element={<DashboardLayout handleLogout={handleLogout}><VistaGestionClientes /></DashboardLayout>} />
-            <Route path="/gestion-conductores" element={<DashboardLayout handleLogout={handleLogout}><GestionConductores /></DashboardLayout>} />
-            <Route path="/solicitudes-conductores" element={<DashboardLayout handleLogout={handleLogout}><VistaSolicitudesConductores /></DashboardLayout>} />
-            <Route path="/grabaciones-camara" element={<DashboardLayout handleLogout={handleLogout}><GrabacionesCamara /></DashboardLayout>} />
-            <Route path="/configuracion" element={<DashboardLayout handleLogout={handleLogout}><VistaConfiguracion /></DashboardLayout>} />
-          </>
-        )}
-
-        {/* Redirigir a login si no hay sesión */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        {/* Ruta por defecto */}
+        <Route 
+          path="/" 
+          element={<Navigate to="/login" replace />} 
+        />
+        
+        {/* Capturar todas las rutas no encontradas */}
+        <Route 
+          path="*" 
+          element={<Navigate to="/login" replace />} 
+        />
       </Routes>
     </Router>
   );

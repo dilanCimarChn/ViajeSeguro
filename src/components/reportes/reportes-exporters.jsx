@@ -161,22 +161,53 @@ export const exportarCSV = (dataToExport, activeTab, fechaInicio, fechaFin, idio
   document.body.removeChild(link);
 };
 
-// Función para generar vista HTML optimizada para PDF
+// Función para generar vista HTML optimizada para PDF (sin dependencias externas)
 const generarVistaHTML = (dataToExport, columns, title, subtitle, extraInfo = '') => {
-  const tableRows = dataToExport.map(row => 
-    `<tr>${row.map(cell => `<td>${String(cell || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>`).join('')}</tr>`
-  ).join('');
+  // Validar datos de entrada
+  if (!dataToExport || !Array.isArray(dataToExport)) {
+    console.warn('Datos de exportación inválidos');
+    return '';
+  }
   
+  if (!columns || !Array.isArray(columns)) {
+    console.warn('Columnas inválidas');
+    return '';
+  }
+
+  // Escapar HTML para prevenir XSS
+  const escapeHtml = (text) => {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  };
+
+  // Generar filas de la tabla de forma segura
+  const tableRows = dataToExport.map(row => {
+    if (!Array.isArray(row)) return '';
+    
+    const cells = row.map(cell => {
+      const cellContent = cell !== null && cell !== undefined ? String(cell) : '';
+      return `<td>${escapeHtml(cellContent)}</td>`;
+    }).join('');
+    
+    return `<tr>${cells}</tr>`;
+  }).join('');
+  
+  // Procesar información extra de métricas
   const metricsSection = extraInfo ? `
     <div class="metrics-section">
       <h3>📊 Resumen Ejecutivo</h3>
       <div class="metrics-content">
-        ${extraInfo.split('\n').filter(line => line.trim()).map(line => 
-          `<div class="metric-item">${line.trim()}</div>`
-        ).join('')}
+        ${extraInfo.split('\n')
+          .filter(line => line.trim())
+          .map(line => `<div class="metric-item">${escapeHtml(line.trim())}</div>`)
+          .join('')}
       </div>
     </div>
   ` : '';
+  
+  // Generar encabezados de tabla de forma segura
+  const tableHeaders = columns.map(col => `<th>${escapeHtml(col)}</th>`).join('');
   
   return `
     <!DOCTYPE html>
@@ -184,7 +215,7 @@ const generarVistaHTML = (dataToExport, columns, title, subtitle, extraInfo = ''
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${title} - Viaje Seguro</title>
+      <title>${escapeHtml(title)} - Viaje Seguro</title>
       <style>
         * {
           margin: 0;
@@ -439,8 +470,8 @@ const generarVistaHTML = (dataToExport, columns, title, subtitle, extraInfo = ''
       <div class="container">
         <div class="header">
           <div class="company-name">🚗 VIAJE SEGURO</div>
-          <div class="report-title">${title}</div>
-          <div class="report-subtitle">${subtitle}</div>
+          <div class="report-title">${escapeHtml(title)}</div>
+          <div class="report-subtitle">${escapeHtml(subtitle)}</div>
           <div class="generation-info">Generado: ${new Date().toLocaleString('es-ES')}</div>
         </div>
         
@@ -466,7 +497,7 @@ const generarVistaHTML = (dataToExport, columns, title, subtitle, extraInfo = ''
         
         <table class="data-table">
           <thead>
-            <tr>${columns.map(col => `<th>${col}</th>`).join('')}</tr>
+            <tr>${tableHeaders}</tr>
           </thead>
           <tbody>
             ${tableRows}
@@ -482,20 +513,41 @@ const generarVistaHTML = (dataToExport, columns, title, subtitle, extraInfo = ''
       </div>
       
       <script>
-        // Auto-focus en la ventana para facilitar el print
-        window.focus();
-        
-        // Función para imprimir
+        // Función para imprimir directamente sin dependencias externas
         function imprimirReporte() {
-          window.print();
+          try {
+            window.print();
+          } catch (error) {
+            console.error('Error al intentar imprimir:', error);
+            alert('Error al intentar imprimir. Use Ctrl+P manualmente.');
+          }
+        }
+        
+        // Auto-focus en la ventana para facilitar el print
+        try {
+          window.focus();
+        } catch (error) {
+          console.warn('No se pudo enfocar la ventana:', error);
         }
         
         // Detectar si se abrió para imprimir inmediatamente
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('autoprint') === 'true') {
-          setTimeout(() => {
-            window.print();
-          }, 1000);
+        try {
+          const urlParams = new URLSearchParams(window.location.search);
+          if (urlParams.get('autoprint') === 'true') {
+            setTimeout(() => {
+              imprimirReporte();
+            }, 1000);
+          }
+        } catch (error) {
+          console.warn('Error al procesar parámetros URL:', error);
+        }
+        
+        // Limpiar posibles referencias a librerías externas
+        if (typeof window.jsPDF !== 'undefined') {
+          delete window.jsPDF;
+        }
+        if (typeof window.autoTable !== 'undefined') {
+          delete window.autoTable;
         }
       </script>
     </body>
@@ -503,8 +555,9 @@ const generarVistaHTML = (dataToExport, columns, title, subtitle, extraInfo = ''
   `;
 };
 
-// Función principal de exportación PDF (ahora solo HTML)
+// Función principal de exportación PDF (solo HTML, sin jsPDF)
 export const exportarPDF = (dataToExport, activeTab, fechaInicio, fechaFin, metricas) => {
+  // Validación inicial
   if (!dataToExport || dataToExport.length === 0) {
     alert('No hay datos para exportar');
     return;
@@ -518,158 +571,199 @@ export const exportarPDF = (dataToExport, activeTab, fechaInicio, fechaFin, metr
   let extraInfo = '';
   let processedData = [];
 
-  // Configurar datos según tipo de reporte
-  switch(activeTab) {
-    case 'viajes':
-      processedData = dataToExport.map(v => [
-        v.fecha || '', 
-        (v.origen || '').length > 25 ? (v.origen || '').substring(0, 22) + '...' : (v.origen || ''), 
-        (v.destino || '').length > 25 ? (v.destino || '').substring(0, 22) + '...' : (v.destino || ''), 
-        v.estado || '', 
-        (v.conductor || '').length > 20 ? (v.conductor || '').substring(0, 17) + '...' : (v.conductor || ''), 
-        (v.cliente || '').length > 20 ? (v.cliente || '').substring(0, 17) + '...' : (v.cliente || ''), 
-        formatCurrency(v.precio || 0), 
-        `${(v.distancia || 0).toFixed(1)} km`, 
-        `${v.duracion || 0} min`, 
-        `⭐ ${v.calificacion || 0}`
-      ]);
-      columns = ['Fecha', 'Origen', 'Destino', 'Estado', 'Conductor', 'Cliente', 'Precio', 'Distancia', 'Duración', 'Calificación'];
-      title = '🚗 Reporte de Viajes';
-      subtitle = `📅 Período: ${formatDateShort(fechaInicio)} - ${formatDateShort(fechaFin)}`;
-      
-      if (metricas && metricas.viajes) {
-        extraInfo = `💰 Ganancia Total: ${formatCurrency(metricas.viajes.gananciaTotal || 0)}
+  try {
+    // Configurar datos según tipo de reporte
+    switch(activeTab) {
+      case 'viajes':
+        processedData = dataToExport.map(v => [
+          v.fecha || '', 
+          (v.origen || '').length > 25 ? (v.origen || '').substring(0, 22) + '...' : (v.origen || ''), 
+          (v.destino || '').length > 25 ? (v.destino || '').substring(0, 22) + '...' : (v.destino || ''), 
+          v.estado || '', 
+          (v.conductor || '').length > 20 ? (v.conductor || '').substring(0, 17) + '...' : (v.conductor || ''), 
+          (v.cliente || '').length > 20 ? (v.cliente || '').substring(0, 17) + '...' : (v.cliente || ''), 
+          formatCurrency(v.precio || 0), 
+          `${(v.distancia || 0).toFixed(1)} km`, 
+          `${v.duracion || 0} min`, 
+          `⭐ ${v.calificacion || 0}`
+        ]);
+        columns = ['Fecha', 'Origen', 'Destino', 'Estado', 'Conductor', 'Cliente', 'Precio', 'Distancia', 'Duración', 'Calificación'];
+        title = '🚗 Reporte de Viajes';
+        subtitle = `📅 Período: ${formatDateShort(fechaInicio)} - ${formatDateShort(fechaFin)}`;
+        
+        if (metricas && metricas.viajes) {
+          extraInfo = `💰 Ganancia Total: ${formatCurrency(metricas.viajes.gananciaTotal || 0)}
 ✅ Viajes Completados: ${metricas.viajes.viajesCompletados || 0}
 ❌ Viajes Cancelados: ${metricas.viajes.viajesCancelados || 0}
 📏 Distancia Total: ${(metricas.viajes.distanciaTotal || 0).toFixed(1)} km
 📊 Distancia Promedio: ${(metricas.viajes.distanciaPromedio || 0).toFixed(1)} km
 💵 Tarifa Promedio: ${formatCurrency(metricas.viajes.tarifaPromedio || 0)}`;
-      }
-      break;
-      
-    case 'conductores':
-      processedData = dataToExport.map(c => [
-        c.nombre || '', 
-        c.email || '', 
-        c.telefono || '', 
-        c.licencia || '', 
-        c.fechaRegistro || '', 
-        c.estado === 'activo' ? '✅ Activo' : '❌ Inactivo', 
-        c.viajesRealizados || 0, 
-        `⭐ ${(c.calificacionPromedio || 0).toFixed(1)}`,
-        c.modelo_vehiculo || '',
-        c.placa_vehiculo || ''
-      ]);
-      columns = ['Nombre', 'Email', 'Teléfono', 'Licencia', 'Registro', 'Estado', 'Viajes', 'Calificación', 'Modelo', 'Placa'];
-      title = '👥 Reporte de Conductores';
-      subtitle = `📅 Generado: ${formatDateShort(new Date())}`;
-      
-      if (metricas && metricas.conductores) {
-        extraInfo = `✅ Conductores Activos: ${metricas.conductores.activos || 0}
+        }
+        break;
+        
+      case 'conductores':
+        processedData = dataToExport.map(c => [
+          c.nombre || '', 
+          c.email || '', 
+          c.telefono || '', 
+          c.licencia || '', 
+          c.fechaRegistro || '', 
+          c.estado === 'activo' ? '✅ Activo' : '❌ Inactivo', 
+          c.viajesRealizados || 0, 
+          `⭐ ${(c.calificacionPromedio || 0).toFixed(1)}`,
+          c.modelo_vehiculo || '',
+          c.placa_vehiculo || ''
+        ]);
+        columns = ['Nombre', 'Email', 'Teléfono', 'Licencia', 'Registro', 'Estado', 'Viajes', 'Calificación', 'Modelo', 'Placa'];
+        title = '👥 Reporte de Conductores';
+        subtitle = `📅 Generado: ${formatDateShort(new Date())}`;
+        
+        if (metricas && metricas.conductores) {
+          extraInfo = `✅ Conductores Activos: ${metricas.conductores.activos || 0}
 ❌ Conductores Inactivos: ${metricas.conductores.inactivos || 0}
 🚗 Total de Viajes Realizados: ${metricas.conductores.totalViajes || 0}
 ⭐ Calificación Promedio: ${(metricas.conductores.calificacionPromedio || 0).toFixed(1)}`;
-      }
-      break;
-      
-    case 'solicitudes':
-      processedData = dataToExport.map(s => [
-        s.nombre || '', 
-        s.email || '', 
-        s.telefono || '', 
-        s.licencia || '', 
-        s.fechaSolicitud || '', 
-        s.estado === 'aprobada' || s.estado === 'aprobado' ? '✅ Aprobada' : 
-        s.estado === 'rechazada' || s.estado === 'rechazado' ? '❌ Rechazada' : 
-        '⏳ Pendiente', 
-        s.documentosCompletos ? '✅ Completos' : '❌ Incompletos',
-        s.fecha_aprobacion || 'N/A',
-        s.modelo_vehiculo || ''
-      ]);
-      columns = ['Nombre', 'Email', 'Teléfono', 'Licencia', 'Fecha Solicitud', 'Estado', 'Documentos', 'Fecha Aprobación', 'Vehículo'];
-      title = '📋 Reporte de Solicitudes';
-      subtitle = `📅 Generado: ${formatDateShort(new Date())}`;
-      
-      if (metricas && metricas.solicitudes) {
-        extraInfo = `⏳ Pendientes: ${metricas.solicitudes.pendientes || 0}
+        }
+        break;
+        
+      case 'solicitudes':
+        processedData = dataToExport.map(s => [
+          s.nombre || '', 
+          s.email || '', 
+          s.telefono || '', 
+          s.licencia || '', 
+          s.fechaSolicitud || '', 
+          s.estado === 'aprobada' || s.estado === 'aprobado' ? '✅ Aprobada' : 
+          s.estado === 'rechazada' || s.estado === 'rechazado' ? '❌ Rechazada' : 
+          '⏳ Pendiente', 
+          s.documentosCompletos ? '✅ Completos' : '❌ Incompletos',
+          s.fecha_aprobacion || 'N/A',
+          s.modelo_vehiculo || ''
+        ]);
+        columns = ['Nombre', 'Email', 'Teléfono', 'Licencia', 'Fecha Solicitud', 'Estado', 'Documentos', 'Fecha Aprobación', 'Vehículo'];
+        title = '📋 Reporte de Solicitudes';
+        subtitle = `📅 Generado: ${formatDateShort(new Date())}`;
+        
+        if (metricas && metricas.solicitudes) {
+          extraInfo = `⏳ Pendientes: ${metricas.solicitudes.pendientes || 0}
 ✅ Aprobadas: ${metricas.solicitudes.aprobadas || 0}
 ❌ Rechazadas: ${metricas.solicitudes.rechazadas || 0}
 ⏰ Tiempo Promedio de Aprobación: ${(metricas.solicitudes.tiempoPromedioAprobacion || 0).toFixed(1)} horas`;
-      }
-      break;
-      
-    case 'admins':
-      processedData = dataToExport.map(a => [
-        a.nombre || '', 
-        a.email || '', 
-        a.rol || '', 
-        a.fechaRegistro || '', 
-        a.ultimoAcceso || '', 
-        a.accionesRealizadas || 0,
-        a.active ? '✅ Activo' : '❌ Inactivo'
-      ]);
-      columns = ['Nombre', 'Email', 'Rol', 'Registro', 'Último Acceso', 'Acciones', 'Estado'];
-      title = '🛡️ Reporte de Administradores';
-      subtitle = `📅 Generado: ${formatDateShort(new Date())}`;
-      break;
-      
-    case 'grabaciones':
-      processedData = dataToExport.map(g => [
-        g.viajeId || '', 
-        g.conductorId || '', 
-        g.fecha || '', 
-        g.duracion || '', 
-        g.tamaño || '', 
-        g.estado === 'disponible' ? '✅ Disponible' : 
-        g.estado === 'procesando' ? '⏳ Procesando' : '📁 Archivada', 
-        g.visualizaciones || 0
-      ]);
-      columns = ['ID Viaje', 'ID Conductor', 'Fecha', 'Duración', 'Tamaño', 'Estado', 'Visualizaciones'];
-      title = '🎥 Reporte de Grabaciones';
-      subtitle = `📅 Generado: ${formatDateShort(new Date())}`;
-      break;
-      
-    case 'logs':
-      processedData = dataToExport.map(l => [
-        l.fecha || '', 
-        l.usuario || '',
-        l.accion || '', 
-        (l.detalles || '').length > 30 ? (l.detalles || '').substring(0, 27) + '...' : (l.detalles || ''), 
-        l.modulo || '', 
-        l.resultado === 'exitoso' || l.resultado === 'completado' ? '✅ Exitoso' : '❌ Error'
-      ]);
-      columns = ['Fecha', 'Usuario', 'Acción', 'Detalles', 'Módulo', 'Resultado'];
-      title = '📊 Reporte de Logs del Sistema';
-      subtitle = `📅 Generado: ${formatDateShort(new Date())}`;
-      break;
-      
-    default:
-      alert('Tipo de reporte no válido');
-      return;
-  }
+        }
+        break;
+        
+      case 'admins':
+        processedData = dataToExport.map(a => [
+          a.nombre || '', 
+          a.email || '', 
+          a.rol || '', 
+          a.fechaRegistro || '', 
+          a.ultimoAcceso || '', 
+          a.accionesRealizadas || 0,
+          a.active ? '✅ Activo' : '❌ Inactivo'
+        ]);
+        columns = ['Nombre', 'Email', 'Rol', 'Registro', 'Último Acceso', 'Acciones', 'Estado'];
+        title = '🛡️ Reporte de Administradores';
+        subtitle = `📅 Generado: ${formatDateShort(new Date())}`;
+        break;
+        
+      case 'grabaciones':
+        processedData = dataToExport.map(g => [
+          g.viajeId || '', 
+          g.conductorId || '', 
+          g.fecha || '', 
+          g.duracion || '', 
+          g.tamaño || '', 
+          g.estado === 'disponible' ? '✅ Disponible' : 
+          g.estado === 'procesando' ? '⏳ Procesando' : '📁 Archivada', 
+          g.visualizaciones || 0
+        ]);
+        columns = ['ID Viaje', 'ID Conductor', 'Fecha', 'Duración', 'Tamaño', 'Estado', 'Visualizaciones'];
+        title = '🎥 Reporte de Grabaciones';
+        subtitle = `📅 Generado: ${formatDateShort(new Date())}`;
+        break;
+        
+      case 'logs':
+        processedData = dataToExport.map(l => [
+          l.fecha || '', 
+          l.usuario || '',
+          l.accion || '', 
+          (l.detalles || '').length > 30 ? (l.detalles || '').substring(0, 27) + '...' : (l.detalles || ''), 
+          l.modulo || '', 
+          l.resultado === 'exitoso' || l.resultado === 'completado' ? '✅ Exitoso' : '❌ Error'
+        ]);
+        columns = ['Fecha', 'Usuario', 'Acción', 'Detalles', 'Módulo', 'Resultado'];
+        title = '📊 Reporte de Logs del Sistema';
+        subtitle = `📅 Generado: ${formatDateShort(new Date())}`;
+        break;
+        
+      default:
+        throw new Error('Tipo de reporte no válido');
+    }
 
-  try {
     // Generar HTML y abrir en nueva ventana
     const htmlContent = generarVistaHTML(processedData, columns, title, subtitle, extraInfo);
     
-    const printWindow = window.open('', '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+    // Usar un identificador único para evitar problemas de caché
+    const timestamp = new Date().getTime();
+    const windowName = `reporte_${activeTab}_${timestamp}`;
+    
+    // Configuración de ventana más específica
+    const windowFeatures = [
+      'width=1200',
+      'height=800',
+      'scrollbars=yes',
+      'resizable=yes',
+      'toolbar=no',
+      'location=no',
+      'directories=no',
+      'status=no',
+      'menubar=no',
+      'copyhistory=no'
+    ].join(',');
+    
+    const printWindow = window.open('', windowName, windowFeatures);
     
     if (!printWindow) {
-      alert('Por favor, permita las ventanas emergentes para generar el reporte.');
-      return;
+      throw new Error('Las ventanas emergentes están bloqueadas. Por favor, permita las ventanas emergentes para generar el reporte.');
     }
     
+    // Limpiar y escribir el contenido
+    printWindow.document.open();
     printWindow.document.write(htmlContent);
     printWindow.document.close();
-    printWindow.focus();
     
-    // Mostrar instrucciones después de un breve delay
+    // Esperar a que la ventana cargue completamente
+    printWindow.onload = function() {
+      printWindow.focus();
+      
+      // Mostrar instrucciones después de un breve delay
+      setTimeout(() => {
+        alert('✅ Reporte generado exitosamente!\n\n💡 En la nueva ventana:\n• Presiona Ctrl+P (Cmd+P en Mac)\n• Selecciona "Guardar como PDF"\n• Ajusta la configuración si es necesario');
+      }, 500);
+    };
+    
+    // Fallback si onload no funciona
     setTimeout(() => {
-      alert('✅ Reporte generado exitosamente!\n\n💡 En la nueva ventana:\n• Presiona Ctrl+P (Cmd+P en Mac)\n• Selecciona "Guardar como PDF"\n• Ajusta la configuración si es necesario');
-    }, 500);
+      if (printWindow && !printWindow.closed) {
+        printWindow.focus();
+      }
+    }, 1000);
     
   } catch (error) {
     console.error('Error al generar reporte HTML:', error);
-    alert('Error al generar el reporte. Por favor, intente nuevamente.');
+    
+    // Mensaje de error más específico
+    let errorMessage = 'Error al generar el reporte.';
+    
+    if (error.message.includes('ventanas emergentes')) {
+      errorMessage = 'Error: Las ventanas emergentes están bloqueadas. Por favor, permita las ventanas emergentes en su navegador.';
+    } else if (error.message.includes('no válido')) {
+      errorMessage = 'Error: Tipo de reporte no válido. Por favor, seleccione una categoría válida.';
+    } else {
+      errorMessage = `Error al generar el reporte: ${error.message}. Por favor, intente nuevamente.`;
+    }
+    
+    alert(errorMessage);
   }
 };

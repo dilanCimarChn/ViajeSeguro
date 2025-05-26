@@ -18,6 +18,7 @@ import {
   signOut
 } from 'firebase/auth';
 import { db } from '../../utils/firebase';
+import GestionAdmTabla from './gestion-adm-tabla';
 import './gestion-usuarios.css';
 
 const GestionUsuarios = () => {
@@ -40,17 +41,13 @@ const GestionUsuarios = () => {
   const [nuevaClave, setNuevaClave] = useState('');
   const [confirmarClave, setConfirmarClave] = useState('');
   const [showNewUserModal, setShowNewUserModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
   const [notificacion, setNotificacion] = useState({ 
     visible: false, 
     mensaje: '', 
     tipo: '' 
   });
   const [nuevoUsuario, setNuevoUsuario] = useState(null);
-  
-  // Estados adicionales que faltaban
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('registro'); // Estado para controlar la vista activa
   
   // Configuraciones de autenticación
   const auth = getAuth();
@@ -179,44 +176,6 @@ const GestionUsuarios = () => {
     } catch (error) {
       console.error('Error al cambiar contraseña:', error);
       mostrarNotificacion('Error al cambiar contraseña', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Restablecimiento de contraseña de usuario existente
-  const restablecerContrasena = async () => {
-    if (!selectedUser) return;
-
-    setLoading(true);
-    try {
-      // Generar nueva contraseña
-      const nuevaContraseña = generarContraseña();
-
-      // Reestablecer contraseña en Firebase
-      const userRef = doc(db, 'usuarios', selectedUser.id);
-      await updateDoc(userRef, {
-        requiereCambioPassword: true,
-        fechaRestablecimientoPassword: new Date().toISOString()
-      });
-
-      // Cerrar modal de restablecimiento
-      setShowPasswordModal(false);
-      
-      // Preparar usuario con nueva contraseña para mostrar
-      setNuevoUsuario({
-        ...selectedUser,
-        password: nuevaContraseña,
-        email: selectedUser.email
-      });
-      
-      // Mostrar modal con nueva contraseña
-      setShowNewUserModal(true);
-
-      mostrarNotificacion('Contraseña restablecida exitosamente', 'success');
-    } catch (error) {
-      console.error('Error al restablecer contraseña:', error);
-      mostrarNotificacion('Error al restablecer contraseña', 'error');
     } finally {
       setLoading(false);
     }
@@ -370,363 +329,245 @@ const GestionUsuarios = () => {
     }
   };
 
-  // Habilitar / Deshabilitar usuario
-const toggleAccountStatus = async (userId, currentStatus) => {
-  try {
-    await updateDoc(doc(db, 'usuarios', userId), { 
-      active: !currentStatus,
-      fechaActualizacion: new Date().toISOString()
-    });
+  // Copiar información al portapapeles
+  const copiarAlPortapapeles = (texto) => {
+    navigator.clipboard.writeText(texto)
+      .then(() => mostrarNotificacion('Información copiada al portapapeles', 'success'))
+      .catch(err => mostrarNotificacion('Error al copiar información', 'error'));
+  };
 
-    const mensaje = !currentStatus ? 'Administrador activado correctamente' : 'Administrador desactivado correctamente';
-    mostrarNotificacion(mensaje, 'success');
-  } catch (error) {
-    console.error('Error al actualizar estado del usuario:', error);
-    mostrarNotificacion('Error al actualizar estado del administrador', 'error');
-  }
-};
-
-// Copiar información al portapapeles
-const copiarAlPortapapeles = (texto) => {
-  navigator.clipboard.writeText(texto)
-    .then(() => mostrarNotificacion('Información copiada al portapapeles', 'success'))
-    .catch(err => mostrarNotificacion('Error al copiar información', 'error'));
-};
-
-// Filtrar usuarios por búsqueda
-const filteredUsuarios = usuarios.filter(user => {
-  const searchLower = searchTerm.toLowerCase();
-  return (
-    user.email?.toLowerCase().includes(searchLower) ||
-    user.role?.toLowerCase().includes(searchLower) ||
-    user.nombres?.toLowerCase().includes(searchLower) ||
-    user.apellidoPaterno?.toLowerCase().includes(searchLower) ||
-    user.apellidoMaterno?.toLowerCase().includes(searchLower) ||
-    user.ci?.includes(searchTerm)
-  );
-});
-
-// Traducir rol
-const traducirRol = (rol) => {
-  switch(rol) {
-    case 'admin': return 'Administrador';
-    case 'receptionist': return 'Recepcionista';
-    default: return rol;
-  }
-};// Renderizado de modal de cambio de contraseña
-const renderModalCambioClave = () => {
-  return (
-    <div className="modal-overlay">
-      <div className="modal-container">
-        <div className="modal-header">
-          <h3>Cambio de Contraseña Obligatorio</h3>
-        </div>
-        
-        <form onSubmit={handleCambioClave} className="modal-body">
-          <p>Por seguridad, debe cambiar su contraseña en el primer inicio de sesión.</p>
-          
-          <div className="form-group">
-            <label htmlFor="nuevaClave">Nueva Contraseña</label>
-            <input 
-              type="password"
-              id="nuevaClave"
-              value={nuevaClave}
-              onChange={(e) => setNuevaClave(e.target.value)}
-              required
-              minLength={8}
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="confirmarClave">Confirmar Nueva Contraseña</label>
-            <input 
-              type="password"
-              id="confirmarClave"
-              value={confirmarClave}
-              onChange={(e) => setConfirmarClave(e.target.value)}
-              required
-              minLength={8}
-            />
-          </div>
-          
-          <div className="form-info">
-            <p><small>La contraseña debe contener:</small></p>
-            <ul>
-              <li>Mínimo 8 caracteres</li>
-              <li>Al menos una mayúscula</li>
-              <li>Al menos una minúscula</li>
-              <li>Al menos un número</li>
-              <li>Al menos un carácter especial</li>
-            </ul>
-          </div>
-          
-          <div className="modal-footer">
-            <button 
-              type="submit" 
-              className="btn-primary" 
-              disabled={loading}
-            >
-              {loading ? 'Cambiando...' : 'Cambiar Contraseña'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-// Renderizado de componente principal
-return (
-  <div className="gestion-usuarios-container">
-    {/* Modal de cambio de contraseña obligatorio */}
-    {modalCambioClave && renderModalCambioClave()}
-
-    {/* Modal de restablecimiento de contraseña para usuarios existentes */}
-    {showPasswordModal && (
+  // Renderizado de modal de cambio de contraseña
+  const renderModalCambioClave = () => {
+    return (
       <div className="modal-overlay">
         <div className="modal-container">
           <div className="modal-header">
-            <h3>Restablecer Contraseña</h3>
-            <button 
-              className="close-button" 
-              onClick={() => setShowPasswordModal(false)}
-            >
-              &times;
-            </button>
+            <h3>Cambio de Contraseña Obligatorio</h3>
           </div>
           
-          <div className="modal-body">
-            <p>¿Está seguro que desea restablecer la contraseña para {selectedUser?.nombres} {selectedUser?.apellidoPaterno}?</p>
-            <p>Se generará una nueva contraseña temporal y se requerirá cambio en el próximo inicio de sesión.</p>
-          </div>
-          
-          <div className="modal-footer">
-            <button 
-              className="btn-secondary" 
-              onClick={() => setShowPasswordModal(false)}
-            >
-              Cancelar
-            </button>
-            <button 
-              className="btn-primary" 
-              onClick={restablecerContrasena}
-              disabled={loading}
-            >
-              {loading ? 'Restableciendo...' : 'Restablecer Contraseña'}
-            </button>
-          </div>
+          <form onSubmit={handleCambioClave} className="modal-body">
+            <p>Por seguridad, debe cambiar su contraseña en el primer inicio de sesión.</p>
+            
+            <div className="form-group">
+              <label htmlFor="nuevaClave">Nueva Contraseña</label>
+              <input 
+                type="password"
+                id="nuevaClave"
+                value={nuevaClave}
+                onChange={(e) => setNuevaClave(e.target.value)}
+                required
+                minLength={8}
+              />
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="confirmarClave">Confirmar Nueva Contraseña</label>
+              <input 
+                type="password"
+                id="confirmarClave"
+                value={confirmarClave}
+                onChange={(e) => setConfirmarClave(e.target.value)}
+                required
+                minLength={8}
+              />
+            </div>
+            
+            <div className="form-info">
+              <p><small>La contraseña debe contener:</small></p>
+              <ul>
+                <li>Mínimo 8 caracteres</li>
+                <li>Al menos una mayúscula</li>
+                <li>Al menos una minúscula</li>
+                <li>Al menos un número</li>
+                <li>Al menos un carácter especial</li>
+              </ul>
+            </div>
+            
+            <div className="modal-footer">
+              <button 
+                type="submit" 
+                className="btn-primary" 
+                disabled={loading}
+              >
+                {loading ? 'Cambiando...' : 'Cambiar Contraseña'}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
-    )}
+    );
+  };
 
-    {/* Encabezado de sección */}
-    <div className="section-header">
-      <h2>Panel de Gestión de Administradores</h2>
-      <div className="green-underline"></div>
-    </div>
-    
-    {/* Sección de formulario */}
-    <div className="usuarios-section">
-      <div className="form-card">
-        <h3>Registrar Nuevo Administrador</h3>
+  // Renderizado del formulario de registro
+  const renderFormularioRegistro = () => {
+    return (
+      <div className="usuarios-section">
+        <div className="form-card">
+          <h3>Registrar Nuevo Administrador</h3>
+          
+          <form onSubmit={handleSubmit} className="usuario-form">
+            <div className="form-grid">
+              <div className="form-group">
+                <label htmlFor="nombres">Nombres *</label>
+                <input 
+                  type="text" 
+                  id="nombres"
+                  name="nombres" 
+                  value={formData.nombres} 
+                  onChange={handleInputChange} 
+                  required 
+                />
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="apellidoPaterno">Apellido Paterno *</label>
+                <input 
+                  type="text" 
+                  id="apellidoPaterno"
+                  name="apellidoPaterno" 
+                  value={formData.apellidoPaterno} 
+                  onChange={handleInputChange} 
+                  required 
+                />
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="apellidoMaterno">Apellido Materno</label>
+                <input 
+                  type="text" 
+                  id="apellidoMaterno"
+                  name="apellidoMaterno" 
+                  value={formData.apellidoMaterno} 
+                  onChange={handleInputChange} 
+                />
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="ci">Carnet de Identidad *</label>
+                <input 
+                  type="text" 
+                  id="ci"
+                  name="ci" 
+                  value={formData.ci} 
+                  onChange={handleInputChange} 
+                  pattern="\d{5,10}"
+                  title="El carnet debe contener entre 5 y 10 dígitos"
+                  required 
+                />
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="genero">Género *</label>
+                <select 
+                  id="genero"
+                  name="genero" 
+                  value={formData.genero} 
+                  onChange={handleInputChange}
+                  required
+                >
+                  <option value="masculino">Masculino</option>
+                  <option value="femenino">Femenino</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="celular">Celular *</label>
+                <input 
+                  type="tel" 
+                  id="celular"
+                  name="celular" 
+                  value={formData.celular} 
+                  onChange={handleInputChange} 
+                  pattern="\d{8}"
+                  title="El número de celular debe contener 8 dígitos"
+                  required 
+                />
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="role">Tipo de Administrador *</label>
+                <select 
+                  id="role"
+                  name="role" 
+                  value={formData.role} 
+                  onChange={handleInputChange}
+                  required
+                >
+                  <option value="receptionist">Recepcionista</option>
+                  <option value="admin">Administrador</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="form-info">
+              <p><small>* Campos obligatorios</small></p>
+              <p><small>El correo electrónico se generará automáticamente usando la primera letra del nombre, el apellido paterno completo y la primera letra del apellido materno.</small></p>
+              <p><small>La contraseña se generará automáticamente.</small></p>
+            </div>
+            
+            <div className="form-actions">
+              <button type="submit" className="btn-primary" disabled={loading}>
+                {loading ? 'Creando...' : 'Crear Nuevo Administrador'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  // Renderizado de componente principal
+  return (
+    <div className="gestion-usuarios-container">
+      {/* Modal de cambio de contraseña obligatorio */}
+      {modalCambioClave && renderModalCambioClave()}
+
+      {/* Encabezado de sección */}
+      <div className="section-header">
+        <h2>Panel de Gestión de Administradores</h2>
+        <div className="green-underline"></div>
+      </div>
+
+      {/* Sistema de pestañas */}
+      <div className="tabs-container">
+        <div className="tabs-nav">
+          <button 
+            className={`tab-button ${activeTab === 'registro' ? 'active' : ''}`}
+            onClick={() => setActiveTab('registro')}
+          >
+            <i className="fa fa-plus-circle"></i>
+            <span>Registrar Administrador</span>
+          </button>
+          <button 
+            className={`tab-button ${activeTab === 'lista' ? 'active' : ''}`}
+            onClick={() => setActiveTab('lista')}
+          >
+            <i className="fa fa-list"></i>
+            <span>Lista de Administradores</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Contenido de las pestañas */}
+      <div className="tab-content">
+        {activeTab === 'registro' && renderFormularioRegistro()}
         
-        <form onSubmit={handleSubmit} className="usuario-form">
-          <div className="form-grid">
-            <div className="form-group">
-              <label htmlFor="nombres">Nombres *</label>
-              <input 
-                type="text" 
-                id="nombres"
-                name="nombres" 
-                value={formData.nombres} 
-                onChange={handleInputChange} 
-                required 
-              />
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="apellidoPaterno">Apellido Paterno *</label>
-              <input 
-                type="text" 
-                id="apellidoPaterno"
-                name="apellidoPaterno" 
-                value={formData.apellidoPaterno} 
-                onChange={handleInputChange} 
-                required 
-              />
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="apellidoMaterno">Apellido Materno</label>
-              <input 
-                type="text" 
-                id="apellidoMaterno"
-                name="apellidoMaterno" 
-                value={formData.apellidoMaterno} 
-                onChange={handleInputChange} 
-              />
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="ci">Carnet de Identidad *</label>
-              <input 
-                type="text" 
-                id="ci"
-                name="ci" 
-                value={formData.ci} 
-                onChange={handleInputChange} 
-                pattern="\d{5,10}"
-                title="El carnet debe contener entre 5 y 10 dígitos"
-                required 
-              />
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="genero">Género *</label>
-              <select 
-                id="genero"
-                name="genero" 
-                value={formData.genero} 
-                onChange={handleInputChange}
-                required
-              >
-                <option value="masculino">Masculino</option>
-                <option value="femenino">Femenino</option>
-                <option value="otro">Otro</option>
-              </select>
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="celular">Celular *</label>
-              <input 
-                type="tel" 
-                id="celular"
-                name="celular" 
-                value={formData.celular} 
-                onChange={handleInputChange} 
-                pattern="\d{8}"
-                title="El número de celular debe contener 8 dígitos"
-                required 
-              />
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="role">Tipo de Administrador *</label>
-              <select 
-                id="role"
-                name="role" 
-                value={formData.role} 
-                onChange={handleInputChange}
-                required
-              >
-                <option value="receptionist">Recepcionista</option>
-                <option value="admin">Administrador</option>
-              </select>
-            </div>
-          </div>
-          
-          <div className="form-info">
-            <p><small>* Campos obligatorios</small></p>
-            <p><small>El correo electrónico se generará automáticamente usando la primera letra del nombre, el apellido paterno completo y la primera letra del apellido materno.</small></p>
-            <p><small>La contraseña se generará automáticamente.</small></p>
-          </div>
-          
-          <div className="form-actions">
-            <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Creando...' : 'Crear Nuevo Administrador'}
-            </button>
-          </div>
-        </form>
+        {activeTab === 'lista' && (
+          <GestionAdmTabla 
+            usuarios={usuarios}
+            loading={loading}
+            mostrarNotificacion={mostrarNotificacion}
+            generarContraseña={generarContraseña}
+            copiarAlPortapapeles={copiarAlPortapapeles}
+            setShowNewUserModal={setShowNewUserModal}
+            setNuevoUsuario={setNuevoUsuario}
+            showNewUserModal={showNewUserModal}
+            nuevoUsuario={nuevoUsuario}
+          />
+        )}
       </div>
-    </div>
-    
-    {/* Sección de lista de usuarios */}
-    <div className="usuarios-section">
-      <h3>Administradores Registrados en el Sistema</h3>
-      
-      <div className="search-bar">
-        <input
-          type="text"
-          placeholder="Buscar por nombre, apellido, correo o carnet"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="search-input"
-        />
-      </div>
-      
-      {loading && (
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p className="loading-message">Cargando usuarios...</p>
-        </div>
-      )}
-      
-      {!loading && filteredUsuarios.length === 0 && (
-        <div className="no-results">
-          <i className="fa fa-exclamation-circle"></i>
-          <p>No hay administradores que coincidan con la búsqueda.</p>
-        </div>
-      )}
-      
-      {!loading && filteredUsuarios.length > 0 && (
-        <div className="table-container">
-          <table className="usuarios-table">
-            <thead>
-              <tr>
-                <th>Nombre Completo</th>
-                <th>Correo Electrónico</th>
-                <th>Carnet</th>
-                <th>Celular</th>
-                <th>Tipo</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsuarios.map(user => (
-                <tr key={user.id} className={user.active ? 'row-active' : 'row-inactive'}>
-                  <td data-label="Nombre Completo">
-                    {`${user.nombres || ''} ${user.apellidoPaterno || ''} ${user.apellidoMaterno || ''}`}
-                  </td>
-                  <td data-label="Correo Electrónico">{user.email}</td>
-                  <td data-label="Carnet">{user.ci}</td>
-                  <td data-label="Celular">{user.celular}</td>
-                  <td data-label="Tipo">{traducirRol(user.role)}</td>
-                  <td data-label="Estado">
-                    <span className={`status-badge ${user.active ? 'active' : 'inactive'}`}>
-                      {user.active ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </td>
-                  <td data-label="Acciones">
-                    <div className="action-buttons">
-                      <button 
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setShowPasswordModal(true);
-                        }} 
-                        className="btn-table-action btn-password"
-                        title="Restablecer contraseña"
-                      >
-                        <i className="fa fa-key"></i>
-                        <span>Cambiar Contraseña</span>
-                      </button>
-                      <button 
-                        onClick={() => toggleAccountStatus(user.id, user.active)} 
-                        className={`btn-table-action ${user.active ? 'btn-deactivate' : 'btn-activate'}`}
-                        title={user.active ? 'Desactivar administrador' : 'Activar administrador'}
-                      >
-                        <i className={user.active ? "fa fa-toggle-on" : "fa fa-toggle-off"}></i>
-                        <span>{user.active ? 'Desactivar' : 'Activar'}</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      
+
       {/* Modal para nuevo usuario */}
       {showNewUserModal && nuevoUsuario && (
         <div className="modal-overlay">
@@ -744,7 +585,7 @@ return (
             <div className="modal-body">
               <h4>Información del Administrador</h4>
               <p><strong>Nombre completo:</strong> {`${nuevoUsuario.nombres} ${nuevoUsuario.apellidoPaterno} ${nuevoUsuario.apellidoMaterno}`}</p>
-              <p><strong>Tipo:</strong> {traducirRol(nuevoUsuario.role)}</p>
+              <p><strong>Tipo:</strong> {nuevoUsuario.role === 'admin' ? 'Administrador' : 'Recepcionista'}</p>
               
               <div className="credentials-box">
                 <h4>Credenciales de Acceso</h4>
@@ -798,8 +639,7 @@ return (
         </div>
       )}
     </div>
-  </div>
-);
+  );
 };
 
 export default GestionUsuarios;

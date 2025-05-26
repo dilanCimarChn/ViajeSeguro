@@ -7,7 +7,7 @@ const DashboardLayout = ({ children, handleLogout }) => {
   return (
     <div className="dashboard-layout">
       <BarraNavLateral handleLogout={handleLogout} />
-      <div className="content-area">
+      <div className="content">
         {children}
       </div>
     </div>

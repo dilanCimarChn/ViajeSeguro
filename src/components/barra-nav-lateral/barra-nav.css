@@ -1,4 +1,3 @@
-
 /* barra-nav.css - Versión refinada y optimizada */
 
 /* ===================== VARIABLES ===================== */
@@ -25,7 +24,7 @@
   width: var(--sidebar-width);
   background-color: var(--secondary-color);
   color: white;
-  height: 100%;
+  height: 100vh;
   padding: 24px 20px;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
   overflow-y: auto;
@@ -143,15 +142,25 @@
   font-size: 14px;
 }
 
-.sidebar.hidden ~ .toggle-btn {
-  left: 20px !important;
+/* ===================== CONTROL DEL CONTENIDO PRINCIPAL ===================== */
+/* Estas clases se aplican al body desde el componente React */
+body.sidebar-visible .content {
+  margin-left: var(--sidebar-width);
+  width: calc(100% - var(--sidebar-width));
 }
 
-/* En pantallas pequeñas */
-@media (max-width: 768px) {
-  .toggle-btn {
-    left: 20px !important;
-  }
+body.sidebar-hidden .content {
+  margin-left: 0;
+  width: 100%;
+}
+
+/* Posición del botón toggle según estado del sidebar */
+body.sidebar-visible .toggle-btn {
+  left: 248px;
+}
+
+body.sidebar-hidden .toggle-btn {
+  left: 20px;
 }
 
 /* ===================== SCROLLBAR ===================== */
@@ -174,12 +183,12 @@
 
 /* ===================== RESPONSIVE ===================== */
 @media (max-width: 1024px) {
-  .toggle-btn {
-    left: 20px;
-  }
-
-  .sidebar:not(.hidden) ~ .toggle-btn {
+  body.sidebar-visible .toggle-btn {
     left: calc(var(--sidebar-width) + 8px);
+  }
+  
+  body.sidebar-hidden .toggle-btn {
+    left: 20px;
   }
 }
 
@@ -188,17 +197,28 @@
     transform: translateX(-100%);
   }
 
-  .sidebar.hidden ~ .content {
+  /* En móviles, por defecto el sidebar está oculto */
+  body.sidebar-hidden .content {
     margin-left: 0;
     width: 100%;
   }
 
-  .toggle-btn {
-    left: 20px;
+  /* Solo cuando se muestra explícitamente en móviles */
+  body.sidebar-visible .content {
+    margin-left: 0;
+    width: 100%;
   }
   
-}
+  body.sidebar-visible .toggle-btn,
+  body.sidebar-hidden .toggle-btn {
+    left: 20px;
+  }
 
+  /* Mostrar sidebar cuando está visible en móviles */
+  body.sidebar-visible .sidebar {
+    transform: translateX(0);
+  }
+}
 
 @media (max-width: 576px) {
   .sidebar {
@@ -219,16 +239,9 @@
     width: 32px;
     height: 32px;
   }
-
-  .sidebar:not(.hidden) ~ .toggle-btn {
-    left: calc(var(--sidebar-width,240px) + 8px);
-  }
 }
 
 /* ===================== AJUSTES FINALES ===================== */
 #toggle-btn-unique:not(:first-of-type) {
   display: none;
-}
-.content {
-  transition: all 0.3s ease;
 }

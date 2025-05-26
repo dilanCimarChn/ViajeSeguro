@@ -20,6 +20,23 @@ const BarraNavLateral = ({ handleLogout: appHandleLogout }) => {
     }
   }, []);
 
+  // Efecto para aplicar clases al body cuando cambia la visibilidad
+  useEffect(() => {
+    const body = document.body;
+    if (isVisible) {
+      body.classList.add('sidebar-visible');
+      body.classList.remove('sidebar-hidden');
+    } else {
+      body.classList.add('sidebar-hidden');
+      body.classList.remove('sidebar-visible');
+    }
+
+    // Cleanup function para remover las clases cuando el componente se desmonte
+    return () => {
+      body.classList.remove('sidebar-visible', 'sidebar-hidden');
+    };
+  }, [isVisible]);
+
   const navOptions = {
     admin: [
       { path: '/gestion-usuarios', label: 'Gestión de Administradores' },
@@ -51,13 +68,13 @@ const BarraNavLateral = ({ handleLogout: appHandleLogout }) => {
         appHandleLogout();
       } else {
         console.log("Iniciando proceso de logout desde barra lateral");
-        
+       
         // Limpiar datos de usuario
         localStorage.removeItem('userRole');
-        
+       
         // Cerrar sesión de Firebase
         await signOut(auth);
-        
+       
         // Redirigir a login con redirección dura
         window.location.href = '/login';
       }
@@ -89,16 +106,16 @@ const BarraNavLateral = ({ handleLogout: appHandleLogout }) => {
         </div>
         <div className="nav-links">
           {userNavOptions.map((option) => (
-            <Link 
-              key={option.path} 
-              to={option.path} 
+            <Link
+              key={option.path}
+              to={option.path}
               className={`nav-button ${location.pathname === option.path ? 'active' : ''}`}
               data-discover="true"
             >
               {option.label}
             </Link>
           ))}
-          
+         
           <button className="nav-button logout-button" onClick={handleLogout}>
             Cerrar sesión
           </button>
