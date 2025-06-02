@@ -32,7 +32,7 @@ const BarraNavLateral = ({ handleLogout: appHandleLogout }) => {
       body.classList.remove('sidebar-visible');
     }
 
-    // Cleanup function para remover las clases cuando el componente se desmonte
+    // Cleanup function para remover las clases cuando el componente se desmonte.
     return () => {
       body.classList.remove('sidebar-visible', 'sidebar-hidden');
     };
