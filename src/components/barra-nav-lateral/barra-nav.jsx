@@ -1,3 +1,4 @@
+// components/barra-nav-lateral/barra-nav.jsx - VERSIÓN ACTUALIZADA
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getAuth, signOut } from 'firebase/auth';
@@ -37,23 +38,26 @@ const BarraNavLateral = ({ handleLogout: appHandleLogout }) => {
     };
   }, [isVisible]);
 
+  // 🆕 OPCIONES DE NAVEGACIÓN ACTUALIZADAS CON PERFIL
   const navOptions = {
     admin: [
-      { path: '/gestion-usuarios', label: 'Gestión de Administradores' },
-      { path: '/gestion-clientes', label: 'Gestión de Clientes' },
-      { path: '/gestion-conductores', label: 'Gestión de Conductores' },
-      { path: '/solicitudes-conductores', label: 'Solicitudes Conductores' },
-      { path: '/viajes-tiempo-real', label: 'Viajes en Tiempo Real' },
-      { path: '/grabaciones-camara', label: 'Grabaciones de Cámara' },
-      { path: '/reportes', label: 'Reportes' },
-      { path: '/configuracion', label: 'Configuración' },
+      { path: '/gestion-usuarios', label: 'Gestión de Administradores', icon: 'fa-users-cog' },
+      { path: '/gestion-clientes', label: 'Gestión de Clientes', icon: 'fa-users' },
+      { path: '/gestion-conductores', label: 'Gestión de Conductores', icon: 'fa-car' },
+      { path: '/solicitudes-conductores', label: 'Solicitudes Conductores', icon: 'fa-clipboard-list' },
+      { path: '/viajes-tiempo-real', label: 'Viajes en Tiempo Real', icon: 'fa-route' },
+      { path: '/grabaciones-camara', label: 'Grabaciones de Cámara', icon: 'fa-video' },
+      { path: '/reportes', label: 'Reportes', icon: 'fa-chart-bar' },
+      { path: '/configuracion', label: 'Configuración', icon: 'fa-cog' },
+      { path: '/mi-perfil', label: 'Mi Perfil', icon: 'fa-user-circle' }, // 🆕 NUEVO
     ],
     receptionist: [
-      { path: '/gestion-clientes', label: 'Gestión de Clientes' },
-      { path: '/gestion-conductores', label: 'Gestión de Conductores' },
-      { path: '/solicitudes-conductores', label: 'Solicitudes Conductores' },
-      { path: '/grabaciones-camara', label: 'Grabaciones de Cámara' },
-      { path: '/configuracion', label: 'Configuración' },
+      { path: '/gestion-clientes', label: 'Gestión de Clientes', icon: 'fa-users' },
+      { path: '/gestion-conductores', label: 'Gestión de Conductores', icon: 'fa-car' },
+      { path: '/solicitudes-conductores', label: 'Solicitudes Conductores', icon: 'fa-clipboard-list' },
+      { path: '/grabaciones-camara', label: 'Grabaciones de Cámara', icon: 'fa-video' },
+      { path: '/configuracion', label: 'Configuración', icon: 'fa-cog' },
+      { path: '/mi-perfil', label: 'Mi Perfil', icon: 'fa-user-circle' }, // 🆕 NUEVO
     ],
   };
 
@@ -104,7 +108,9 @@ const BarraNavLateral = ({ handleLogout: appHandleLogout }) => {
           <h2>VIAJE SEGURO</h2>
           <p>PANEL DE {userRole === 'admin' ? 'ADMINISTRADOR' : 'RECEPCIONISTA'}</p>
         </div>
+        
         <div className="nav-links">
+          {/* 🆕 NAVEGACIÓN CON ICONOS */}
           {userNavOptions.map((option) => (
             <Link
               key={option.path}
@@ -112,12 +118,18 @@ const BarraNavLateral = ({ handleLogout: appHandleLogout }) => {
               className={`nav-button ${location.pathname === option.path ? 'active' : ''}`}
               data-discover="true"
             >
-              {option.label}
+              {option.icon && <i className={`fas ${option.icon}`}></i>}
+              <span>{option.label}</span>
             </Link>
           ))}
-         
+          
+          {/* 🆕 SEPARADOR VISUAL */}
+          <div className="nav-separator"></div>
+          
+          {/* 🆕 BOTÓN DE LOGOUT CON ICONO */}
           <button className="nav-button logout-button" onClick={handleLogout}>
-            Cerrar sesión
+            <i className="fas fa-sign-out-alt"></i>
+            <span>Cerrar sesión</span>
           </button>
         </div>
       </div>

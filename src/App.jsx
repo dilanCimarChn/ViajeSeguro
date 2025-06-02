@@ -1,3 +1,4 @@
+// App.jsx - VERSIÓN ACTUALIZADA CON PERFIL DE USUARIO
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import BienvenidaLogin from './views/vlogin/bienvenida-login';
@@ -11,6 +12,7 @@ import VistaViajesTiempoReal from './views/vviajes-en-tiempo-real/viajes-tiempo-
 import GrabacionesCamara from './components/camara/GrabacionesCamara.jsx';
 import VistaConfiguracion from './views/vconfiguracion/configuracion';
 import Reportes from './components/reportes/reportes.jsx';
+import PerfilUsuario from './components/perfil-usuario/perfil-Usuario.jsx'; 
 import DashboardLayout from './components/barra-nav-lateral/Layout.jsx';
 import { getAuth, signOut, setPersistence, browserSessionPersistence } from 'firebase/auth';
 
@@ -53,19 +55,19 @@ function App() {
     }
   };
 
-  // Función helper para verificar permisos
+  // 🆕 FUNCIÓN HELPER ACTUALIZADA CON LA NUEVA RUTA
   const hasPermission = (route) => {
     if (!userRole) return false;
     
     const adminRoutes = [
       '/gestion-usuarios', '/gestion-clientes', '/gestion-conductores',
       '/solicitudes-conductores', '/perfil-cliente', '/viajes-tiempo-real',
-      '/grabaciones-camara', '/reportes', '/configuracion'
+      '/grabaciones-camara', '/reportes', '/configuracion', '/mi-perfil' // 🆕 AGREGADO
     ];
     
     const receptionistRoutes = [
       '/gestion-clientes', '/gestion-conductores', '/solicitudes-conductores',
-      '/grabaciones-camara', '/configuracion'
+      '/grabaciones-camara', '/configuracion', '/mi-perfil' // 🆕 AGREGADO
     ];
     
     if (userRole === 'admin') {
@@ -117,6 +119,16 @@ function App() {
         <Route 
           path="/login" 
           element={<RegLogin setUserRole={setUserRole} />} 
+        />
+
+        {/* 🆕 NUEVA RUTA PARA PERFIL DE USUARIO */}
+        <Route 
+          path="/mi-perfil" 
+          element={
+            <ProtectedRoute path="/mi-perfil">
+              <PerfilUsuario />
+            </ProtectedRoute>
+          } 
         />
 
         {/* Rutas protegidas para Admin */}
