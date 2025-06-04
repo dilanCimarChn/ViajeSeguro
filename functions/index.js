@@ -1,278 +1,273 @@
-// functions/index.js
-const functions = require('firebase-functions');
-const nodemailer = require('nodemailer');
-const cors = require('cors');
+const {onRequest} = require("firebase-functions/v2/https");
+const {logger} = require("firebase-functions");
+const admin = require("firebase-admin");
 
-// Configurar CORS para permitir peticiones desde tu dominio
-const corsHandler = cors({
-  origin: [
-    'http://localhost:3000',
-    'https://viajeseguro-b204d.web.app',
-    'https://viajeseguro-b204d.firebaseapp.com'
-  ],
-  credentials: true
-});
+admin.initializeApp();
 
-// 📧 FUNCIÓN PARA ENVIAR CREDENCIALES POR EMAIL
-exports.enviarCredenciales = functions.https.onRequest(async (req, res) => {
-  return corsHandler(req, res, async () => {
-    // Solo permitir método POST
-    if (req.method !== 'POST') {
-      return res.status(405).json({
+/**
+ * Función para enviar credenciales por email
+ * Envía las credenciales de nuevos usuarios a su correo personal
+ */
+exports.enviarCredenciales = onRequest({
+  cors: {
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:5173",
+      "http://localhost:4173",
+      "https://viajeseguro-b204d.web.app",
+      "https://viajeseguro-b204d.firebaseapp.com",
+    ],
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  },
+}, async (req, res) => {
+  // Log de inicio
+  logger.info("🚀 Iniciando función enviarCredenciales", {
+    method: req.method,
+    headers: req.headers,
+    body: req.body,
+  });
+
+  // Verificar método HTTP
+  if (req.method !== "POST") {
+    logger.warn("❌ Método no permitido:", req.method);
+    return res.status(405).json({
+      success: false,
+      message: "Método no permitido. Use POST.",
+    });
+  }
+
+  try {
+    // Extraer datos del body
+    const {
+      destinatario,
+      nombreCompleto,
+      emailCorporativo,
+      passwordTemporal,
+      tipo,
+    } = req.body;
+
+    // Log de datos recibidos
+    logger.info("📋 Datos recibidos:", {
+      destinatario,
+      nombreCompleto,
+      emailCorporativo,
+      tipo,
+      hasPassword: !!passwordTemporal,
+    });
+
+    // Validar datos requeridos
+    if (!destinatario || !nombreCompleto || !emailCorporativo || !passwordTemporal) {
+      logger.error("❌ Faltan datos requeridos");
+      return res.status(400).json({
         success: false,
-        message: 'Método no permitido. Use POST.'
+        message: "Faltan datos requeridos: destinatario, nombreCompleto, emailCorporativo, passwordTemporal",
       });
     }
 
-    try {
-      console.log('📧 ========================================');
-      console.log('📧 FUNCIÓN FIREBASE: ENVIAR CREDENCIALES');
-      console.log('📧 ========================================');
-      
-      const { 
-        destinatario, 
-        emailCorporativo, 
-        passwordTemporal, 
-        nombreCompleto, 
-        tipo 
-      } = req.body;
-
-      // Validar datos requeridos
-      if (!destinatario || !emailCorporativo || !passwordTemporal || !nombreCompleto) {
-        console.log('❌ Datos faltantes en la petición');
-        return res.status(400).json({
-          success: false,
-          message: 'Datos faltantes: destinatario, emailCorporativo, passwordTemporal y nombreCompleto son requeridos'
-        });
-      }
-
-      console.log('📮 Destinatario:', destinatario);
-      console.log('👤 Nombre:', nombreCompleto);
-      console.log('📧 Email corporativo:', emailCorporativo);
-      console.log('🎭 Tipo:', tipo);
-
-      // 🔧 CONFIGURACIÓN DE NODEMAILER
-      // IMPORTANTE: Usa Gmail App Password o servicio SMTP de tu elección
-      const transporter = nodemailer.createTransporter({
-        service: 'gmail',
-        auth: {
-          user: functions.config().gmail.user, // Configurado con firebase functions:config:set
-          pass: functions.config().gmail.pass  // App Password de Gmail
-        }
+    // Validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(destinatario)) {
+      logger.error("❌ Email destinatario inválido:", destinatario);
+      return res.status(400).json({
+        success: false,
+        message: "El email del destinatario no es válido",
       });
+    }
 
-      // 📄 PLANTILLA DEL EMAIL
-      const htmlTemplate = `
+    if (!emailRegex.test(emailCorporativo)) {
+      logger.error("❌ Email corporativo inválido:", emailCorporativo);
+      return res.status(400).json({
+        success: false,
+        message: "El email corporativo no es válido",
+      });
+    }
+
+    // Obtener configuración de Gmail
+    const functions = require("firebase-functions");
+    const gmailUser = functions.config().gmail?.user;
+    const gmailPass = functions.config().gmail?.pass;
+
+    logger.info("🔧 Configuración Gmail:", {
+      hasUser: !!gmailUser,
+      hasPass: !!gmailPass,
+      userEmail: gmailUser ? gmailUser.substring(0, 3) + "***" : "undefined",
+    });
+
+    if (!gmailUser || !gmailPass) {
+      logger.error("❌ Configuración de Gmail no encontrada");
+      logger.error("💡 Ejecute: firebase functions:config:set gmail.user=EMAIL gmail.pass=PASSWORD");
+      return res.status(500).json({
+        success: false,
+        message: "Configuración de email no encontrada en el servidor",
+      });
+    }
+
+    // Configurar nodemailer
+    const nodemailer = require("nodemailer");
+
+    const transporter = nodemailer.createTransporter({
+      service: "gmail",
+      auth: {
+        user: gmailUser,
+        pass: gmailPass,
+      },
+    });
+
+    logger.info("📧 Transporter configurado");
+
+    // Verificar conexión
+    await transporter.verify();
+    logger.info("✅ Conexión SMTP verificada");
+
+    // Configurar email
+    const mailOptions = {
+      from: `"ViajeSeguro - Sistema de Administración" <${gmailUser}>`,
+      to: destinatario,
+      subject: `🔐 Credenciales de Acceso - ViajeSeguro (${tipo})`,
+      html: `
         <!DOCTYPE html>
-        <html lang="es">
+        <html>
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Credenciales Viaje Seguro</title>
-          <style>
-            body {
-              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-              line-height: 1.6;
-              margin: 0;
-              padding: 0;
-              background-color: #f5f5f5;
-            }
-            .container {
-              max-width: 600px;
-              margin: 20px auto;
-              background: white;
-              border-radius: 12px;
-              overflow: hidden;
-              box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            }
-            .header {
-              background: linear-gradient(135deg, #007293 0%, #009688 100%);
-              color: white;
-              padding: 30px;
-              text-align: center;
-            }
-            .header h1 {
-              margin: 0;
-              font-size: 24px;
-              font-weight: 600;
-            }
-            .content {
-              padding: 30px;
-            }
-            .credentials-box {
-              background: #e0f2f1;
-              border: 1px solid #b2dfdb;
-              border-radius: 8px;
-              padding: 20px;
-              margin: 20px 0;
-              border-left: 4px solid #007293;
-            }
-            .credential-item {
-              margin: 10px 0;
-              padding: 10px;
-              background: white;
-              border-radius: 4px;
-              font-family: monospace;
-              word-break: break-all;
-            }
-            .warning {
-              background: #fff3e0;
-              border: 1px solid #ffcc02;
-              border-radius: 8px;
-              padding: 15px;
-              margin: 20px 0;
-              border-left: 4px solid #ff9800;
-            }
-            .footer {
-              background: #f5f5f5;
-              padding: 20px;
-              text-align: center;
-              color: #666;
-              font-size: 14px;
-            }
-            .btn {
-              display: inline-block;
-              padding: 12px 24px;
-              background: #007293;
-              color: white;
-              text-decoration: none;
-              border-radius: 6px;
-              margin: 10px 0;
-              font-weight: 600;
-            }
-          </style>
+          <title>Credenciales de Acceso - ViajeSeguro</title>
         </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>🚗 VIAJE SEGURO</h1>
-              <p>Credenciales de Acceso al Sistema</p>
+        <body style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #2c5530 0%, #4a7c59 100%); padding: 30px 20px; text-align: center;">
+              <h1 style="color: white; margin: 0; font-size: 28px; font-weight: bold;">🚗 ViajeSeguro</h1>
+              <p style="color: #e8f5e8; margin: 5px 0 0 0; font-size: 16px;">Sistema de Administración</p>
             </div>
             
-            <div class="content">
-              <h2>¡Hola ${nombreCompleto}!</h2>
-              
-              <p>Te damos la bienvenida al sistema <strong>Viaje Seguro</strong>. Has sido registrado como <strong>${tipo}</strong> en nuestra plataforma.</p>
-              
-              <div class="credentials-box">
-                <h3>🔐 Tus Credenciales de Acceso:</h3>
-                
-                <p><strong>📧 Email Corporativo:</strong></p>
-                <div class="credential-item">${emailCorporativo}</div>
-                
-                <p><strong>🔑 Contraseña Temporal:</strong></p>
-                <div class="credential-item">${passwordTemporal}</div>
+            <!-- Content -->
+            <div style="padding: 30px 20px;">
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h2 style="color: #2c5530; margin: 0 0 10px 0; font-size: 24px;">¡Bienvenido/a al Sistema!</h2>
+                <p style="color: #666; margin: 0; font-size: 16px;">Sus credenciales de acceso han sido generadas</p>
               </div>
               
-              <div class="warning">
-                <h4>⚠️ Información Importante:</h4>
-                <ul>
-                  <li><strong>Debes cambiar tu contraseña</strong> en el primer inicio de sesión</li>
-                  <li>Esta contraseña es <strong>temporal y única</strong></li>
-                  <li>No compartas estas credenciales con terceros</li>
-                  <li>Si tienes problemas, contacta al administrador del sistema</li>
+              <!-- User Info -->
+              <div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 25px; border-left: 4px solid #4a7c59;">
+                <h3 style="color: #2c5530; margin: 0 0 15px 0; font-size: 18px;">📋 Información del Usuario</h3>
+                <p style="margin: 8px 0; font-size: 15px;"><strong>👤 Nombre:</strong> ${nombreCompleto}</p>
+                <p style="margin: 8px 0; font-size: 15px;"><strong>🎭 Tipo de Usuario:</strong> ${tipo}</p>
+                <p style="margin: 8px 0; font-size: 15px;"><strong>📧 Correo Personal:</strong> ${destinatario}</p>
+              </div>
+              
+              <!-- Credentials -->
+              <div style="background: linear-gradient(135deg, #e8f5e8 0%, #f0f8f0 100%); border-radius: 8px; padding: 25px; margin-bottom: 25px; border: 2px solid #4a7c59;">
+                <h3 style="color: #2c5530; margin: 0 0 20px 0; font-size: 18px; text-align: center;">🔐 Sus Credenciales de Acceso</h3>
+                
+                <div style="background: white; border-radius: 6px; padding: 15px; margin-bottom: 15px; border: 1px solid #ddd;">
+                  <p style="margin: 0 0 5px 0; font-size: 14px; color: #666; font-weight: bold;">CORREO ELECTRÓNICO:</p>
+                  <p style="margin: 0; font-size: 16px; color: #2c5530; font-family: 'Courier New', monospace; font-weight: bold;">${emailCorporativo}</p>
+                </div>
+                
+                <div style="background: white; border-radius: 6px; padding: 15px; border: 1px solid #ddd;">
+                  <p style="margin: 0 0 5px 0; font-size: 14px; color: #666; font-weight: bold;">CONTRASEÑA TEMPORAL:</p>
+                  <p style="margin: 0; font-size: 16px; color: #d63384; font-family: 'Courier New', monospace; font-weight: bold; background: #fff3cd; padding: 8px; border-radius: 4px; border: 1px solid #ffeaa7;">${passwordTemporal}</p>
+                </div>
+              </div>
+              
+              <!-- Instructions -->
+              <div style="background-color: #fff3cd; border-radius: 8px; padding: 20px; margin-bottom: 25px; border-left: 4px solid #ffc107;">
+                <h3 style="color: #856404; margin: 0 0 15px 0; font-size: 18px;">⚠️ Instrucciones Importantes</h3>
+                <ol style="margin: 0; padding-left: 20px; color: #856404;">
+                  <li style="margin-bottom: 8px;">Acceda al sistema usando las credenciales proporcionadas</li>
+                  <li style="margin-bottom: 8px;"><strong>DEBE cambiar su contraseña</strong> en el primer inicio de sesión</li>
+                  <li style="margin-bottom: 8px;">La nueva contraseña debe cumplir los requisitos de seguridad</li>
+                  <li style="margin-bottom: 8px;">Mantenga sus credenciales seguras y no las comparta</li>
+                  <li>Contacte al administrador si tiene problemas de acceso</li>
+                </ol>
+              </div>
+              
+              <!-- Security Requirements -->
+              <div style="background-color: #d1ecf1; border-radius: 8px; padding: 20px; margin-bottom: 25px; border-left: 4px solid #17a2b8;">
+                <h3 style="color: #0c5460; margin: 0 0 15px 0; font-size: 16px;">🔒 Requisitos de Contraseña</h3>
+                <ul style="margin: 0; padding-left: 20px; color: #0c5460; font-size: 14px;">
+                  <li>Mínimo 8 caracteres</li>
+                  <li>Al menos una letra mayúscula</li>
+                  <li>Al menos una letra minúscula</li>
+                  <li>Al menos un número</li>
+                  <li>Al menos un carácter especial (!@#$%^&*)</li>
                 </ul>
               </div>
               
+              <!-- CTA Button -->
               <div style="text-align: center; margin: 30px 0;">
-                <a href="https://viajeseguro-b204d.web.app/login" class="btn">
+                <a href="#" style="display: inline-block; background: linear-gradient(135deg, #4a7c59 0%, #2c5530 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
                   🚀 Acceder al Sistema
                 </a>
               </div>
               
-              <p>Si no puedes hacer clic en el botón, copia y pega este enlace en tu navegador:</p>
-              <p style="word-break: break-all; color: #007293;">
-                https://viajeseguro-b204d.web.app/login
+            </div>
+            
+            <!-- Footer -->
+            <div style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e9ecef;">
+              <p style="margin: 0; color: #6c757d; font-size: 14px;">
+                📧 Este es un correo automático del sistema ViajeSeguro<br>
+                🔐 Por su seguridad, no responda a este correo
+              </p>
+              <p style="margin: 10px 0 0 0; color: #adb5bd; font-size: 12px;">
+                © ${new Date().getFullYear()} ViajeSeguro - Sistema de Administración
               </p>
             </div>
             
-            <div class="footer">
-              <p><strong>Viaje Seguro</strong> - Sistema de Gestión de Transporte</p>
-              <p>Este es un email automático, no responder a esta dirección.</p>
-            </div>
           </div>
         </body>
         </html>
-      `;
+      `,
+    };
 
-      // 📨 CONFIGURACIÓN DEL EMAIL
-      const mailOptions = {
-        from: `"Viaje Seguro Sistema" <${functions.config().gmail.user}>`,
-        to: destinatario,
-        subject: `🔐 Credenciales de acceso - Viaje Seguro (${tipo})`,
-        html: htmlTemplate,
-        // Versión texto plano como respaldo
-        text: `
-Hola ${nombreCompleto},
+    logger.info("📤 Enviando email...", {
+      from: mailOptions.from,
+      to: destinatario,
+      subject: mailOptions.subject,
+    });
 
-Te damos la bienvenida al sistema Viaje Seguro.
-Has sido registrado como ${tipo}.
+    // Enviar email
+    const info = await transporter.sendMail(mailOptions);
 
-Tus credenciales de acceso:
-📧 Email: ${emailCorporativo}
-🔑 Contraseña: ${passwordTemporal}
+    logger.info("✅ Email enviado exitosamente:", {
+      messageId: info.messageId,
+      response: info.response,
+    });
 
-⚠️ IMPORTANTE:
-- Debes cambiar tu contraseña en el primer inicio de sesión
-- Esta contraseña es temporal y única
-- No compartas estas credenciales
-
-Accede al sistema en: https://viajeseguro-b204d.web.app/login
-
-Viaje Seguro - Sistema de Gestión de Transporte
-        `
-      };
-
-      // 🚀 ENVIAR EMAIL
-      console.log('📤 Enviando email...');
-      const info = await transporter.sendMail(mailOptions);
-      
-      console.log('✅ Email enviado exitosamente');
-      console.log('📧 Message ID:', info.messageId);
-      console.log('📮 Destinatario confirmado:', destinatario);
-
-      return res.status(200).json({
-        success: true,
-        message: 'Credenciales enviadas exitosamente',
+    // Respuesta exitosa
+    res.status(200).json({
+      success: true,
+      message: "Credenciales enviadas exitosamente",
+      data: {
         messageId: info.messageId,
-        destinatario: destinatario
-      });
+        destinatario: destinatario,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    logger.error("❌ Error en enviarCredenciales:", {
+      error: error.message,
+      stack: error.stack,
+      code: error.code,
+    });
 
-    } catch (error) {
-      console.error('❌ ========================================');
-      console.error('❌ ERROR AL ENVIAR EMAIL');
-      console.error('❌ ========================================');
-      console.error('❌ Error completo:', error);
-      console.error('❌ Mensaje:', error.message);
-      console.error('❌ Stack:', error.stack);
-
-      return res.status(500).json({
-        success: false,
-        message: 'Error interno del servidor al enviar email',
-        error: error.message
-      });
-    }
-  });
+    res.status(500).json({
+      success: false,
+      message: "Error interno del servidor al enviar credenciales",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
 });
 
-// 🧪 FUNCIÓN DE PRUEBA (opcional)
-exports.testEmail = functions.https.onRequest(async (req, res) => {
-  return corsHandler(req, res, async () => {
-    try {
-      console.log('🧪 Función de prueba de email ejecutada');
-      
-      return res.status(200).json({
-        success: true,
-        message: 'Firebase Functions funcionando correctamente',
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'production'
-      });
-    } catch (error) {
-      return res.status(500).json({
-        success: false,
-        message: 'Error en función de prueba',
-        error: error.message
-      });
-    }
+/**
+ * Función de salud para verificar el estado del servicio
+ */
+exports.health = onRequest((req, res) => {
+  res.status(200).json({
+    status: "OK",
+    message: "Firebase Functions funcionando correctamente",
+    timestamp: new Date().toISOString(),
   });
 });

@@ -236,11 +236,12 @@ const GestionUsuarios = () => {
 
   // 🔧 FIX 2: Función mejorada para envío de emails
   // 🔧 FUNCIÓN enviarEmailCredenciales CORREGIDA CON DEBUG
-// Reemplaza la función enviarEmailCredenciales en tu GestionUsuarios.jsx (líneas 188-225)
+// 🔧 FUNCIÓN enviarEmailCredenciales ACTUALIZADA PARA FIREBASE FUNCTIONS
+// Reemplaza la función enviarEmailCredenciales en tu GestionUsuarios.jsx (líneas 188-283)
 
 const enviarEmailCredenciales = async (usuarioData, password) => {
   console.log('📧 ========================================');
-  console.log('📧 INICIANDO ENVÍO DE EMAIL');
+  console.log('📧 INICIANDO ENVÍO DE EMAIL VIA FIREBASE');
   console.log('📧 ========================================');
   
   setEnviandoEmail(true);
@@ -253,7 +254,7 @@ const enviarEmailCredenciales = async (usuarioData, password) => {
     console.log('🔑 Contraseña temporal:', password);
     console.log('🎭 Tipo de usuario:', usuarioData.role === 'admin' ? 'Administrador' : 'Recepcionista');
     
-    // Preparar payload para el backend
+    // Preparar payload para Firebase Function
     const payload = {
       destinatario: usuarioData.correoPersonal,
       nombreCompleto: `${usuarioData.nombres} ${usuarioData.apellidoPaterno} ${usuarioData.apellidoMaterno || ''}`.trim(),
@@ -262,13 +263,18 @@ const enviarEmailCredenciales = async (usuarioData, password) => {
       tipo: usuarioData.role === 'admin' ? 'Administrador' : 'Recepcionista'
     };
     
-    console.log('📦 Payload para backend:', payload);
-    console.log('🌐 URL del backend: http://localhost:5000/api/enviar-credenciales');
+    console.log('📦 Payload para Firebase Function:', payload);
     
-    // Realizar petición al backend
-    console.log('🚀 Enviando petición HTTP...');
+    // 🔧 URL de Firebase Function (se ajusta automáticamente al entorno)
+    const functionUrl = process.env.NODE_ENV === 'development' 
+      ? 'http://localhost:5001/viajeseguro-b204d/us-central1/enviarCredenciales'  // Emulador local
+      : 'https://us-central1-viajeseguro-b204d.cloudfunctions.net/enviarCredenciales'; // Producción
     
-    const response = await fetch('http://localhost:5000/api/enviar-credenciales', {
+    console.log('🌐 URL Firebase Function:', functionUrl);
+    console.log('🚀 Enviando petición a Firebase Function...');
+    
+    // Realizar petición a Firebase Function
+    const response = await fetch(functionUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -283,20 +289,25 @@ const enviarEmailCredenciales = async (usuarioData, password) => {
 
     if (response.ok) {
       const result = await response.json();
-      console.log('✅ Respuesta exitosa del backend:', result);
-      console.log('📧 Message ID:', result.data?.messageId);
-      console.log('📮 Destinatario confirmado:', result.data?.destinatario);
-      console.log('⏰ Timestamp:', result.data?.timestamp);
+      console.log('✅ Respuesta exitosa de Firebase Function:', result);
       
-      mostrarNotificacion('Credenciales enviadas al correo personal exitosamente', 'success');
-      
-      console.log('✅ ========================================');
-      console.log('✅ EMAIL ENVIADO EXITOSAMENTE');
-      console.log('✅ ========================================');
-      
-      return true;
+      if (result.success) {
+        console.log('📧 Message ID:', result.data?.messageId);
+        console.log('📮 Destinatario confirmado:', result.data?.destinatario);
+        console.log('⏰ Timestamp:', result.data?.timestamp);
+        
+        mostrarNotificacion('Credenciales enviadas al correo personal exitosamente', 'success');
+        
+        console.log('✅ ========================================');
+        console.log('✅ EMAIL ENVIADO EXITOSAMENTE VIA FIREBASE');
+        console.log('✅ ========================================');
+        
+        return true;
+      } else {
+        throw new Error(result.message || 'Error desconocido del servidor');
+      }
     } else {
-      console.error('❌ Error en la respuesta del servidor:');
+      console.error('❌ Error en la respuesta de Firebase Function:');
       console.error('   Status:', response.status);
       console.error('   Status Text:', response.statusText);
       
@@ -310,32 +321,39 @@ const enviarEmailCredenciales = async (usuarioData, password) => {
         console.error('   Respuesta como texto:', textResponse);
       }
       
-      throw new Error(errorData?.message || `Error del servidor: ${response.status} ${response.statusText}`);
+      throw new Error(errorData?.message || `Error HTTP ${response.status}: ${response.statusText}`);
     }
   } catch (error) {
     console.error('❌ ========================================');
-    console.error('❌ ERROR AL ENVIAR EMAIL');
+    console.error('❌ ERROR AL ENVIAR EMAIL VIA FIREBASE');
     console.error('❌ ========================================');
     console.error('❌ Error completo:', error);
     console.error('❌ Tipo de error:', error.name);
     console.error('❌ Mensaje:', error.message);
     
+    // Diagnóstico específico para Firebase Functions
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
-      console.error('🔍 DIAGNÓSTICO: Error de conexión');
-      console.error('   • Verificar que el backend esté ejecutándose en puerto 5000');
-      console.error('   • Comprobar la URL: http://localhost:5000/api/enviar-credenciales');
-      console.error('   • Revisar configuración CORS en el backend');
-      mostrarNotificacion('No se pudo conectar con el servidor de correo. Verifique que el backend esté ejecutándose.', 'warning');
+      console.error('🔍 DIAGNÓSTICO: Error de conexión con Firebase Function');
+      console.error('   • Verificar que las Functions estén desplegadas correctamente');
+      console.error('   • Comprobar la URL: https://us-central1-viajeseguro-b204d.cloudfunctions.net/enviarCredenciales');
+      console.error('   • Revisar configuración de CORS en Firebase Function');
+      mostrarNotificacion('No se pudo conectar con Firebase Functions. Verificar que estén desplegadas.', 'warning');
     } else if (error.message.includes('CORS')) {
-      console.error('🔍 DIAGNÓSTICO: Error de CORS');
-      console.error('   • Verificar configuración CORS en server.js');
-      console.error('   • Asegurar que el puerto 5173 esté permitido');
-      mostrarNotificacion('Error de CORS. Verificar configuración del servidor.', 'warning');
-    } else if (error.message.includes('500')) {
-      console.error('🔍 DIAGNÓSTICO: Error interno del servidor');
-      console.error('   • Verificar configuración de email en el backend (.env)');
-      console.error('   • Revisar logs del backend para más detalles');
-      mostrarNotificacion('Error interno del servidor de correo. Verificar configuración de email.', 'warning');
+      console.error('🔍 DIAGNÓSTICO: Error de CORS en Firebase Function');
+      console.error('   • Verificar configuración CORS en la función');
+      console.error('   • Asegurar que el dominio esté permitido');
+      mostrarNotificacion('Error de CORS en Firebase Function. Verificar configuración.', 'warning');
+    } else if (error.message.includes('HTTP 4')) {
+      console.error('🔍 DIAGNÓSTICO: Error de petición (4xx)');
+      console.error('   • Verificar formato de datos enviados');
+      console.error('   • Comprobar parámetros requeridos');
+      mostrarNotificacion('Error en los datos enviados a Firebase Function.', 'warning');
+    } else if (error.message.includes('HTTP 5') || error.message.includes('500')) {
+      console.error('🔍 DIAGNÓSTICO: Error interno de Firebase Function (5xx)');
+      console.error('   • Verificar configuración de Gmail en Firebase Functions');
+      console.error('   • Revisar logs de Firebase Functions');
+      console.error('   • Comprobar comando: firebase functions:config:get');
+      mostrarNotificacion('Error interno de Firebase Function. Verificar configuración de Gmail.', 'warning');
     } else {
       console.error('🔍 DIAGNÓSTICO: Error general');
       mostrarNotificacion('Error al enviar credenciales por correo. Las credenciales se muestran en pantalla.', 'warning');
