@@ -180,23 +180,72 @@ const VistaViajesTiempoReal = () => {
   useEffect(() => {
     let isMounted = true;
     
+    // Reemplazar la función cargarConductores en el primer useEffect
     const cargarConductores = async () => {
       try {
-        const conductoresQuery = query(
-          collection(db, 'conductores'),
-          where('estado', '==', 'activo'),
-          orderBy('nombre')
+        console.log('🔄 Cargando conductores...');
+        
+        // Primero intentar cargar desde usuario-app
+        const usuariosQuery = query(
+          collection(db, 'usuario-app'),
+          where('rol', '==', 'conductor')
         );
         
-        const conductoresSnapshot = await getDocs(conductoresQuery);
+        const usuariosSnapshot = await getDocs(usuariosQuery);
         
         if (isMounted) {
-          const conductoresData = conductoresSnapshot.docs.map(doc => ({
-            id: doc.id,
-            nombre: doc.data().nombre || 'Sin nombre',
-            telefono: doc.data().telefono || '',
-            email: doc.data().email || ''
-          }));
+          const conductoresData = [];
+          
+          usuariosSnapshot.forEach(doc => {
+            const data = doc.data();
+            conductoresData.push({
+              id: doc.id,
+              nombre: data.name || data.nombre || 'Sin nombre',
+              telefono: data.telefono || '',
+              email: data.email || '',
+              estado: data.estado_disponibilidad || 'inactivo'
+            });
+          });
+          
+          console.log('✅ Conductores desde usuario-app:', conductoresData);
+          
+          // Si no hay conductores en usuario-app, intentar desde conductores
+          if (conductoresData.length === 0) {
+            console.log('🔄 Intentando cargar desde colección conductores...');
+            
+            const conductoresQuery = query(
+              collection(db, 'conductores'),
+              where('estado', '==', 'activo'),
+              orderBy('nombre')
+            );
+            
+            const conductoresSnapshot = await getDocs(conductoresQuery);
+            
+            conductoresSnapshot.forEach(doc => {
+              const data = doc.data();
+              conductoresData.push({
+                id: doc.id,
+                nombre: data.nombre || 'Sin nombre',
+                telefono: data.telefono || '',
+                email: data.email || '',
+                estado: data.estado || 'activo'
+              });
+            });
+            
+            console.log('✅ Conductores desde conductores:', conductoresData);
+          }
+          
+          // Si aún no hay conductores, agregar tu conductor específico
+          if (conductoresData.length === 0) {
+            console.log('⚠️ No se encontraron conductores, agregando conductor por defecto');
+            conductoresData.push({
+              id: 'TxMEX6ifhGjQAQfWLmsY',
+              nombre: 'Anders Guitars',
+              telefono: '',
+              email: 'bolchiquel1@gmail.com',
+              estado: 'activo'
+            });
+          }
           
           setConductores(conductoresData);
         }
@@ -204,15 +253,22 @@ const VistaViajesTiempoReal = () => {
         console.error("Error al cargar conductores:", error);
         
         if (isMounted) {
-          // Datos de ejemplo si falla
+          // Incluir tu conductor específico en los datos de ejemplo
           setConductores([
-            { id: 'C1', nombre: 'Dilan Cimar', telefono: '123654', email: 'flaquito@gmail.com' },
-            { id: 'C2', nombre: 'Ana Martínez', telefono: '987654', email: 'ana@example.com' },
-            { id: 'C3', nombre: 'Carlos López', telefono: '456789', email: 'carlos@example.com' }
+            { 
+              id: 'TxMEX6ifhGjQAQfWLmsY', 
+              nombre: 'Anders Guitars', 
+              telefono: '', 
+              email: 'bolchiquel1@gmail.com',
+              estado: 'activo'
+            },
+            { id: 'C2', nombre: 'Ana Martínez', telefono: '987654', email: 'ana@example.com', estado: 'activo' },
+            { id: 'C3', nombre: 'Carlos López', telefono: '456789', email: 'carlos@example.com', estado: 'activo' }
           ]);
         }
       }
     };
+    
     
     cargarConductores();
     
@@ -306,7 +362,7 @@ const VistaViajesTiempoReal = () => {
   // Cargar posiciones - depende solo de conductores
   useEffect(() => {
     if (conductores.length === 0) {
-      return; // No hacer nada hasta que se carguen los conductores
+      return;
     }
 
     let unsubscribe;
@@ -319,42 +375,65 @@ const VistaViajesTiempoReal = () => {
         );
         
         unsubscribe = onSnapshot(posicionesQuery, (querySnapshot) => {
+          console.log('📍 Posiciones recibidas:', querySnapshot.size, 'documentos');
+          
           const posicionesData = [];
-          const conductoresIds = new Set(); // Para evitar duplicados
+          const conductoresIds = new Set();
           
           querySnapshot.forEach((doc) => {
             const data = doc.data();
+            console.log('📍 Datos de posición:', data);
+            
             const conductorId = data.conductor_id;
             
             // Solo tomar la posición más reciente de cada conductor
             if (!conductoresIds.has(conductorId)) {
               conductoresIds.add(conductorId);
               
-              // Encontrar nombre del conductor
-              const conductor = conductores.find(c => c.id === conductorId);
+              // Buscar en colección usuario-app también
+              let conductor = conductores.find(c => c.id === conductorId);
+              
+              // Si no se encuentra, usar los datos del documento de posición
+              if (!conductor) {
+                conductor = {
+                  id: conductorId,
+                  nombre: data.conductor_nombre || `Conductor ${conductorId.substr(0, 6)}`,
+                  telefono: '',
+                  email: ''
+                };
+              }
               
               posicionesData.push({
                 id: doc.id,
-                lat: data.lat || -16.505,
-                lng: data.lng || -68.130,
+                lat: data.lat || data.latitud || -16.505,
+                lng: data.lng || data.longitud || -68.130,
                 conductorId: conductorId,
-                conductor: conductor ? conductor.nombre : 'Conductor desconocido',
-                velocidad: data.velocidad || 0,
+                conductor: conductor.nombre,
+                velocidad: Math.round(data.velocidad || data.speed || 0),
                 timestamp: data.timestamp,
-                disponible: data.disponible || false
+                disponible: data.disponible !== false, // Por defecto true
+                precision: data.precision || data.accuracy || 0
               });
             }
           });
           
+          console.log('📍 Posiciones procesadas:', posicionesData);
           setPosiciones(posicionesData);
         }, (error) => {
           console.error("Error al cargar posiciones:", error);
           
-          // Datos de ejemplo en caso de error
+          // Datos de ejemplo específicos para tu conductor
           setPosiciones([
-            { id: '1', lat: -16.505, lng: -68.130, conductorId: 'C1', conductor: 'Dilan Cimar', velocidad: 30, disponible: true },
-            { id: '2', lat: -16.510, lng: -68.125, conductorId: 'C2', conductor: 'Ana Martínez', velocidad: 0, disponible: true },
-            { id: '3', lat: -16.500, lng: -68.140, conductorId: 'C3', conductor: 'Carlos López', velocidad: 45, disponible: false }
+            { 
+              id: '1', 
+              lat: -16.505, 
+              lng: -68.130, 
+              conductorId: 'TxMEX6ifhGjQAQfWLmsY', 
+              conductor: 'Anders Guitars', 
+              velocidad: 0, 
+              disponible: true,
+              precision: 10
+            }
           ]);
         });
         
@@ -363,9 +442,15 @@ const VistaViajesTiempoReal = () => {
         
         // Datos de ejemplo en caso de error
         setPosiciones([
-          { id: '1', lat: -16.505, lng: -68.130, conductorId: 'C1', conductor: 'Dilan Cimar', velocidad: 30, disponible: true },
-          { id: '2', lat: -16.510, lng: -68.125, conductorId: 'C2', conductor: 'Ana Martínez', velocidad: 0, disponible: true },
-          { id: '3', lat: -16.500, lng: -68.140, conductorId: 'C3', conductor: 'Carlos López', velocidad: 45, disponible: false }
+          { 
+            id: '1', 
+            lat: -16.505, 
+            lng: -68.130, 
+            conductorId: 'TxMEX6ifhGjQAQfWLmsY', 
+            conductor: 'Anders Guitars', 
+            velocidad: 0, 
+            disponible: true 
+          }
         ]);
       }
     };
@@ -606,6 +691,7 @@ const VistaViajesTiempoReal = () => {
           key="mapa-conductores" // Key estática para evitar re-renders
         >
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          // Reemplazar la sección de marcadores en el MapContainer
           {posiciones.map((pos) => (
             <Marker 
               key={pos.id} 
@@ -615,9 +701,18 @@ const VistaViajesTiempoReal = () => {
               <Popup>
                 <div className="popup-info">
                   <strong>{pos.conductor}</strong><br />
+                  <small>ID: {pos.conductorId.substr(0, 8)}...</small><br />
                   Velocidad: {pos.velocidad} km/h<br />
-                  Estado: {pos.disponible ? 'Disponible' : 'Ocupado'}<br />
-                  {pos.velocidad > 0 ? 'En movimiento' : 'Detenido'}
+                  Estado: {pos.disponible ? '🟢 Disponible' : '🔴 Ocupado'}<br />
+                  {pos.velocidad > 0 ? '🚗 En movimiento' : '⏸️ Detenido'}<br />
+                  {pos.precision && (
+                    <>Precisión: {Math.round(pos.precision)}m<br /></>
+                  )}
+                  {pos.timestamp && (
+                    <small>
+                      Última actualización: {formatDate(pos.timestamp)}
+                    </small>
+                  )}
                 </div>
               </Popup>
             </Marker>
